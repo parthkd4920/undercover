@@ -92,12 +92,12 @@ Operations `list_claims`, `get_claim`, `list_steps`, `get_policy`, `get_customer
 
 Operations `add_step`, `decide_claim`, `pay_claim` and `sign_off_claim`, with the money rules enforced in the backend. Status transitions: `decide_claim` sets `decided` for a decline, a refer or an approval within the limit, and `waiting_for_sign_off` for an approval over the limit. `pay_claim` pays an approved claim within its payout, blocked over the approval limit unless signed off. `sign_off_claim` records the handler, pays the approved payout and sets `decided`.
 
-- [ ] Tests: deciding CLM-1001 as approve with payout 420 records decision, reason, reference and `decided_on`, and the status becomes `decided`
-- [ ] Tests: deciding with payout 2000 sets `waiting_for_sign_off`, and `pay_claim` of 2000 returns an error whose `detail` says the payout needs a handler's sign-off
-- [ ] Tests: after `sign_off_claim` with a handler who `can_approve_over_limit`, the claim is `decided` with `paid_amount` 2000, `signed_off_by` and `paid_on` set
-- [ ] Tests: `pay_claim` refuses a claim that is not approved, an amount over the approved payout, a claim already paid, and a handler without `can_approve_over_limit` signing off; `decide_claim` refuses a claim that is not in progress
-- [ ] Tests: `add_step` then `list_steps` returns the steps in order
-- [ ] `npm run check:python` passes with coverage at 80% or more
+- [x] Tests: deciding CLM-1001 as approve with payout 420 records decision, reason, reference and `decided_on`, and the status becomes `decided`
+- [x] Tests: deciding with payout 2000 sets `waiting_for_sign_off`, and `pay_claim` of 2000 returns an error whose `detail` says the payout needs a handler's sign-off
+- [x] Tests: after `sign_off_claim` with a handler who `can_approve_over_limit`, the claim is `decided` with `paid_amount` 2000, `signed_off_by` and `paid_on` set
+- [x] Tests: `pay_claim` refuses a claim that is not approved, an amount over the approved payout, a claim already paid, and a handler without `can_approve_over_limit` signing off; `decide_claim` refuses a claim that is already decided, so a test can arrange a claim without calling a model
+- [x] Tests: `add_step` then `list_steps` returns the steps in order
+- [x] `npm run check:python` passes with coverage at 80% or more
 
 ## Phase 4: the agent and its instructions
 
