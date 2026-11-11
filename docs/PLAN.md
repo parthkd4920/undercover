@@ -64,7 +64,7 @@ The dashboard triggers the agent through `run_agent` on the backend, which calls
 
 React with Vite and TypeScript, hash routes, no router dependency. Brand per `docs/BRAND.md`: Instrument Sans for headings and body, Instrument Serif for the tagline, JetBrains Mono for ids, numbers and money; panels rounded with no outline; light and dark modes via `prefers-color-scheme`. The six claim states use Sea Green (`approved`), Raspberry (`declined`), Marigold (`in_progress`), Coral (`waiting_for_sign_off` and `waiting_for_human_review`) and Cerulean (`waiting`), always with text labels. Raspberry and Cerulean have white text; the others have Midnight text.
 
-- `#/` the queue: every claim with its status, amount and six live count cards and a top Run agent button that starts all waiting claims together; refreshed while the agent works.
+- `#/` the queue: every claim with its status, amount and six live count cards and a top Run agent button that automatically processes all waiting claims one by one; refreshed while the agent works.
 - `#/claims/{id}` the claim in full: story, items, documents, the customer and policy, the agent's steps as they happen (polled while the claim is in progress), the decision with payout, reason and policy reference, payment, and a sign-off with a handler choice on claims waiting for sign-off and approve or deny buttons on the claims referred to human to decide.
 - `#/agent` the agent's instructions, read only
 
@@ -310,3 +310,11 @@ Six large responsive cards precede the queue: Total claims, Waiting claims, Appr
 Verification includes concurrent starts before any completion, waiting-only selection from a fresh snapshot, partial failures, duplicate clicks/competing dashboards, empty/loading counts and live count updates. The browser batch test intercepts run requests so it never calls a real model. Desktop/phone screenshots in both themes verify the cards.
 
 Batch/totals verification passed: `npm run check` reports 90 Python tests (99.31% coverage), 52 dashboard tests (95.36% statements), and 22 browser tests. Queue screenshots were inspected at 1440px and 390px in light and dark mode using Playwright Chromium in place of the unavailable MCP server. All six cards fit and remain legible.
+
+## Sequential queue processing correction
+
+After errors during simultaneous runs, the student requested automatic one-at-a-time processing. This supersedes concurrent batch execution above: one click reads the current waiting queue, waits for each run to finish or fail before starting the next, reports the active claim and position, refreshes counts after every attempt, and continues past failures. It does not rerun already-decided or referred claims. The same button and six summary cards remain.
+
+Diagnostic work also preserves saved outcomes when the final agent reply fails: a structured 502 response reports a safe error category and saved status/payment, with the traceback logged under the claim id. Backend text errors and request timeouts become tool error messages. The exact original exceptions have not been established from the generic 500 banners; no live-model retry or development claim mutation is part of this correction.
+
+Sequential-processing verification: the deferred-response unit and browser tests prove a second waiting claim does not start until the first completes; failure tests verify the remaining queue continues. Stubbed failure tests preserve approved/paid, approved/unpaid, referred and declined work. `npm run check` passed with 103 Python tests (99.36% coverage), 52 dashboard tests (95.42% statements), and 22 browser tests.

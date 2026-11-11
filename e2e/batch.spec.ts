@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { ClaimRow } from "../dashboard/src/lib/api";
 
-test("one click starts all waiting claims and refreshes the count cards", async ({
+test("one click runs waiting claims one by one and refreshes the count cards", async ({
   page,
 }) => {
   const records: ClaimRow[] = [
@@ -50,7 +50,7 @@ test("one click starts all waiting claims and refreshes the count cards", async 
   await page.route("**/api/claims/*/run", async (route) => {
     const id = route.request().url().split("/").at(-2) ?? "";
     started.push(id);
-    await pending;
+    if (id === "CLM-1001") await pending;
     const target = records.find((claim) => claim.claim_id === id);
     if (target === undefined) throw new Error(`Unexpected claim ${id}`);
     target.status = "approved";
@@ -64,13 +64,15 @@ test("one click starts all waiting claims and refreshes the count cards", async 
   await expect(summary.locator(".summary-waiting dd")).toHaveText("2");
   await expect(summary.locator(".summary-approved dd")).toHaveText("1");
   await page.getByRole("button", { name: "Run agent", exact: true }).click();
-  await expect
-    .poll(() => started.toSorted((left, right) => left.localeCompare(right)))
-    .toEqual(["CLM-1001", "CLM-1002"]);
+  await expect.poll(() => started).toEqual(["CLM-1001"]);
+  await expect(page.getByRole("status")).toContainText(
+    "Running CLM-1001 (1 of 2)",
+  );
   await expect(
     page.getByRole("button", { name: "Running all waiting claims" }),
   ).toBeDisabled();
   release();
+  await expect.poll(() => started).toEqual(["CLM-1001", "CLM-1002"]);
   await expect(page.getByRole("status")).toContainText(
     "Finished 2 of 2 agent runs",
   );

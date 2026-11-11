@@ -2,6 +2,7 @@
 
 from contextlib import closing
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
@@ -232,3 +233,36 @@ def test_referral_error_is_returned_to_the_model(monkeypatch):
     assert result.startswith("Error:")
     assert "not in progress" in result
     assert client.get("/api/claims/CLM-1001").json()["paid_on"] is None
+
+
+@pytest.mark.parametrize("body", ["Internal Server Error", "{}", "[]"])
+def test_nonstandard_backend_error_is_returned_to_model(body, monkeypatch):
+    """A plain-text server error must not crash the tool's JSON decoder."""
+    transport = httpx.MockTransport(lambda _: httpx.Response(500, text=body))
+    monkeypatch.setattr(
+        main,
+        "backend",
+        lambda: httpx.Client(transport=transport, base_url="http://backend.test"),
+    )
+    result = main.call("POST", "/api/claims/CLM-1001/pay", amount=420)
+    assert result.startswith("Error:")
+    assert "HTTP 500" in result
+
+
+def test_backend_timeout_is_returned_with_saved_work_caution(monkeypatch):
+    """A lost action reply must not be interpreted as proof that nothing was saved."""
+
+    def timeout(request):
+        raise httpx.ReadTimeout("private transport details", request=request)
+
+    monkeypatch.setattr(
+        main,
+        "backend",
+        lambda: httpx.Client(
+            transport=httpx.MockTransport(timeout), base_url="http://backend.test"
+        ),
+    )
+    result = main.call("POST", "/api/claims/CLM-1001/pay", amount=420)
+    assert "ReadTimeout" in result
+    assert "request may already have saved work" in result
+    assert "private transport details" not in result

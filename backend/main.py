@@ -1,6 +1,7 @@
 """The UnderCover backend."""
 
 import json
+import logging
 import sqlite3
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
@@ -10,7 +11,10 @@ from fastapi import FastAPI, HTTPException
 from agent import main as agent
 from backend import database, lifecycle, seed
 from backend.lifecycle import claim_or_error, now
+from backend.run_errors import describe_error, saved_work
 from backend.schemas import Decision, HumanReview, Payment, Referral, SignOff, Step
+
+logger = logging.getLogger(__name__)
 
 INSTRUCTIONS = Path(__file__).resolve().parent / "instructions.md"
 
@@ -162,7 +166,14 @@ def run_agent(claim_id: str) -> dict[str, str]:
         if cursor.rowcount != 1:
             raise HTTPException(409, f"Claim {claim_id} is no longer waiting")
         connection.commit()
-    reply = agent.run(claim_id, claim_id)
+    try:
+        reply = agent.run(claim_id, claim_id)
+    except Exception as error:
+        logger.exception("Agent run failed for %s", claim_id)
+        with closing(database.connect()) as connection:
+            recorded = saved_work(claim_or_error(connection, claim_id))
+        detail = f"{describe_error(error)} {recorded} See backend logs for {claim_id}."
+        raise HTTPException(502, detail) from error
     return {"reply": reply}
 
 

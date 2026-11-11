@@ -41,10 +41,23 @@ def money(amount: float) -> str:
 
 def call(method: str, path: str, **body: object) -> str:
     """Call the backend and return its reply, or the error it reports."""
-    with backend() as client:
-        response = client.request(method, path, json=body or None)
+    try:
+        with backend() as client:
+            response = client.request(method, path, json=body or None)
+    except httpx.RequestError as error:
+        return (
+            f"Error: backend request {method} {path} failed"
+            f" ({type(error).__name__}). Read the claim's current state before"
+            " retrying an action; the request may already have saved work."
+        )
     if response.is_error:
-        return f"Error: {response.json()['detail']}"
+        try:
+            detail = response.json()["detail"]
+        except (ValueError, KeyError, TypeError):
+            detail = (
+                f"Backend request {method} {path} failed (HTTP {response.status_code})"
+            )
+        return f"Error: {detail}"
     return json.dumps(response.json(), indent=2)
 
 

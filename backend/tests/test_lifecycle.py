@@ -285,7 +285,9 @@ def test_failed_agent_run_leaves_claim_in_progress(monkeypatch):
     monkeypatch.setattr("agent.main.run", fail_run)
     failed_client = TestClient(app, raise_server_exceptions=False)
     response = failed_client.post("/api/claims/CLM-1001/run")
-    assert response.status_code == 500
+    assert response.status_code == 502
+    assert "RuntimeError" in response.json()["detail"]
+    assert "Saved status: in progress" in response.json()["detail"]
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "in_progress"
     assert claim["decision"] is None

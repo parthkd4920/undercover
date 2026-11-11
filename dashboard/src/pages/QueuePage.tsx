@@ -40,7 +40,7 @@ export function QueuePage() {
     };
   }, [refresh]);
 
-  /** Start every currently waiting claim together and report individual failures. */
+  /** Process all waiting claims in order, allowing one active run at a time. */
   async function run() {
     if (batchRunning.current) return;
     batchRunning.current = true;
@@ -51,21 +51,25 @@ export function QueuePage() {
       const latest = await listClaims();
       setClaims(latest);
       const waiting = latest.filter((claim) => claim.status === "waiting");
-      const results = await Promise.allSettled(
-        waiting.map((claim) => runAgent(claim.claim_id)),
-      );
-      const failures = results.flatMap((result, index) =>
-        result.status === "rejected"
-          ? [
-              waiting[index].claim_id +
-                ": " +
-                message(result.reason, "The agent could not run"),
-            ]
-          : [],
-      );
-      if (failures.length > 0) setRunError(failures.join("; "));
+      const failures: string[] = [];
+      let completed = 0;
+      for (const [index, claim] of waiting.entries()) {
+        setRunMessage(
+          `Running ${claim.claim_id} (${String(index + 1)} of ${String(waiting.length)})...`,
+        );
+        try {
+          await runAgent(claim.claim_id);
+          completed += 1;
+        } catch (cause) {
+          failures.push(
+            claim.claim_id + ": " + message(cause, "The agent could not run"),
+          );
+          setRunError(failures.join("; "));
+        }
+        refresh();
+      }
       setRunMessage(
-        `Finished ${String(results.length - failures.length)} of ${String(results.length)} agent runs.`,
+        `Finished ${String(completed)} of ${String(waiting.length)} agent runs.`,
       );
     } catch (cause) {
       setRunError(message(cause, "Waiting claims could not be loaded"));
@@ -92,7 +96,9 @@ export function QueuePage() {
           <button disabled={!hasWaiting || running} onClick={() => void run()}>
             {running ? "Running all waiting claims" : "Run agent"}
           </button>
-          <span className="sub">Run all waiting claims together</span>
+          <span className="sub">
+            Run all waiting claims automatically, one at a time
+          </span>
         </div>
         {runMessage !== null && <p role="status">{runMessage}</p>}
         {loadError !== null && (

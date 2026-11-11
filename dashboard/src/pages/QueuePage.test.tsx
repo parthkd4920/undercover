@@ -113,7 +113,7 @@ it("shows an error when the queue cannot be loaded", async () => {
   expect(await screen.findByRole("alert")).toBeDefined();
 });
 
-it("starts every waiting claim before any run completes and prevents duplicate clicks", async () => {
+it("runs waiting claims one by one and prevents duplicate clicks", async () => {
   let finish!: (value: Response) => void;
   const pending = new Promise<Response>((resolve) => {
     finish = resolve;
@@ -136,7 +136,7 @@ it("starts every waiting claim before any run completes and prevents duplicate c
     expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1001/run", {
       method: "POST",
     });
-    expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
       method: "POST",
     });
   });
@@ -147,10 +147,13 @@ it("starts every waiting claim before any run completes and prevents duplicate c
   fireEvent.click(button);
   expect(
     fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"),
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   finish(new Response(JSON.stringify({ reply: "Done" })));
   await pending;
   await screen.findByText("Finished 2 of 2 agent runs.");
+  expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
+    method: "POST",
+  });
   expect(screen.queryByRole("combobox")).toBeNull();
 });
 
