@@ -153,12 +153,12 @@ The backend currently allows a decision on a waiting claim, despite the original
 
 `DecisionPanel` currently labels every unpaid decision as waiting for sign-off, including declines and referrals. Show payment and sign-off information according to the decision and status. The page also silently converts failed customer/policy loads into permanent loading placeholders and failed step loads into an empty history. Show useful errors for these required sections. Clear previous claim state on navigation and ignore responses for a claim that is no longer selected.
 
-- [ ] Tests cover approve, decline and refer: only an approval waiting for sign-off displays the sign-off message and controls; an unpaid approval within the limit has an accurate payment label.
-- [ ] Tests cover sign-off failure, disabled submission while signing, and exclusion of handlers without approval authority.
-- [ ] Tests show customer, policy, steps and handler load failures visibly, without suggesting that missing results are still loading or that the history is empty.
-- [ ] A delayed-response test navigates between claim ids and verifies that the earlier response cannot overwrite the selected claim.
-- [ ] Timer-based tests verify that steps refresh during `in_progress`, the completed decision appears, and polling stops when the claim finishes or the page unmounts. Repeated step descriptions render without duplicate React keys.
-- [ ] Add the brief function comments required by `docs/CODE_STANDARDS.md` to the new page functions; `npm run check:ts` passes with coverage at least 80%.
+- [x] Tests cover approve, decline and refer: only an approval waiting for sign-off displays the sign-off message and controls; an unpaid approval within the limit has an accurate payment label.
+- [x] Tests cover sign-off failure, disabled submission while signing, and exclusion of handlers without approval authority.
+- [x] Tests show customer, policy, steps and handler load failures visibly, without suggesting that missing results are still loading or that the history is empty.
+- [x] A delayed-response test navigates between claim ids and verifies that the earlier response cannot overwrite the selected claim.
+- [x] Timer-based tests verify that steps refresh during `in_progress`, the completed decision appears, and polling stops when the claim finishes or the page unmounts. Repeated step descriptions render without duplicate React keys.
+- [x] Add the brief function comments required by `docs/CODE_STANDARDS.md` to the new page functions; `npm run check:ts` passes with coverage at least 80%.
 
 ### Completion phase 3: make end-to-end verification repeatable
 

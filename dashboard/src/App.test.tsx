@@ -33,7 +33,82 @@ function stubFetch(claims: ClaimRow[]) {
     "fetch",
     vi.fn((input: string) => {
       if (input === "/api/health") return new Response("{}");
-      return new Response(JSON.stringify(claims));
+      if (input === "/api/claims") return new Response(JSON.stringify(claims));
+      if (input === "/api/claims/CLM-1001/steps") return new Response("[]");
+      if (input === "/api/claims/CLM-1001") {
+        return new Response(
+          JSON.stringify({
+            claim_id: "CLM-1001",
+            policy_id: "POL-2001",
+            customer_id: "CUS-3001",
+            claim_type: "trip_delay",
+            submitted_on: "2026-06-24",
+            incident_date: "2026-06-18T00:00:00Z",
+            incident_location: "Rome, Italy",
+            summary: "Flight home canceled by the airline",
+            story: "My flight home from Rome was canceled.",
+            items: [],
+            amount_claimed: 420,
+            documents: [],
+            status: "waiting",
+            decision: null,
+            payout: null,
+            reason: null,
+            reference: null,
+            decided_on: null,
+            signed_off_by: null,
+            signed_off_on: null,
+            paid_amount: null,
+            paid_on: null,
+          }),
+        );
+      }
+      if (input === "/api/customers/CUS-3001") {
+        return new Response(
+          JSON.stringify({
+            customer_id: "CUS-3001",
+            name: "Maya Patel",
+            email: "maya.patel@example.com",
+            phone: "+1 201 555 0143",
+            date_of_birth: "1988-03-14",
+            address: {
+              street: "48 Wayne Street",
+              city: "Jersey City",
+              state: "NJ",
+              zip: "07302",
+            },
+            customer_since: "2023-04-11",
+            previous_claims: [],
+          }),
+        );
+      }
+      if (input === "/api/policies/POL-2001") {
+        return new Response(
+          JSON.stringify({
+            policy_id: "POL-2001",
+            customer_id: "CUS-3001",
+            plan: "premium",
+            add_ons: [],
+            purchased_on: "2026-04-22",
+            sold_through: "Meridian Air checkout",
+            status: "active",
+            trip: {
+              destination: "Rome, Italy",
+              departs_on: "2026-06-10",
+              returns_on: "2026-06-18",
+              trip_cost: 3100,
+            },
+            travelers: ["Maya Patel"],
+          }),
+        );
+      }
+      if (input === "/api/handlers") return new Response("[]");
+      if (input === "/api/agent-instructions") {
+        return new Response(
+          JSON.stringify({ instructions: "# The agent\n\nWords" }),
+        );
+      }
+      throw new Error(`unexpected fetch: ${input}`);
     }),
   );
 }
@@ -73,7 +148,10 @@ it("opens a claim from the queue", async () => {
   window.location.hash = "#/claims/CLM-1001";
   window.dispatchEvent(new HashChangeEvent("hashchange"));
   expect(
-    await screen.findByRole("heading", { name: "Claim CLM-1001" }),
+    await screen.findByRole("heading", { name: "CLM-1001" }),
+  ).toBeDefined();
+  expect(
+    await screen.findByText("My flight home from Rome was canceled."),
   ).toBeDefined();
 });
 
@@ -83,6 +161,7 @@ it("shows the agent instructions page", async () => {
   window.location.hash = "#/agent";
   window.dispatchEvent(new HashChangeEvent("hashchange"));
   expect(
-    await screen.findByRole("heading", { name: "Agent instructions" }),
+    await screen.findByRole("heading", { name: "The agent" }),
   ).toBeDefined();
+  expect(screen.getByText("Words")).toBeDefined();
 });

@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { BackendStatus } from "./components/BackendStatus";
 import { useHashRoute } from "./hooks/useHashRoute";
+import { ClaimPage } from "./pages/ClaimPage";
+import { InstructionsPage } from "./pages/InstructionsPage";
 import { QueuePage } from "./pages/QueuePage";
 
 export function App() {
@@ -10,19 +12,9 @@ export function App() {
   const claimId = /^#\/claims\/(.+)$/.exec(route)?.[1];
   let page: ReactNode;
   if (claimId !== undefined) {
-    page = (
-      <section className="panel">
-        <h2>Claim {claimId}</h2>
-        <p className="sub">The claim in full, next phase of the build</p>
-      </section>
-    );
+    page = <ClaimPage claimId={claimId} />;
   } else if (route === "#/agent") {
-    page = (
-      <section className="panel">
-        <h2>Agent instructions</h2>
-        <p className="sub">Read only, next phase of the build</p>
-      </section>
-    );
+    page = <InstructionsPage />;
   } else {
     page = <QueuePage />;
   }

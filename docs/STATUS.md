@@ -28,3 +28,5 @@ A claim moves `waiting` → `in_progress` → `decided`, or `waiting_for_sign_of
 ## Pilot completion progress
 
 Completion phase 1 is verified: decisions require an in-progress claim, sign-off is based on the approved payout even for a smaller payment request, and money inputs must be finite and nonnegative. Python checks pass: 57 tests, 99.67% coverage. The existing Phase 6 dashboard changes are being completed and reviewed.
+
+Completion phase 2 is verified: the claim and instructions pages are implemented; claim details report failed supporting requests, discard old navigation responses, poll active claims, and show decision-specific payment labels. TypeScript checks pass without warnings: 30 tests, 96.38% statement coverage.
