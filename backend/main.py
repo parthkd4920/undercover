@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
+from agent import main as agent
 from backend import database, seed
 from backend.schemas import Decision, Payment, SignOff, Step
 
@@ -169,6 +170,21 @@ def get_agent_instructions() -> dict[str, str]:
     return {"instructions": INSTRUCTIONS.read_text()}
 
 
+@app.post("/api/claims/{claim_id}/run", operation_id="run_agent")
+def run_agent(claim_id: str) -> dict[str, str]:
+    """Set a claim in progress and run the UnderCover Agent on it."""
+    with closing(database.connect()) as connection:
+        row = claim_or_error(connection, claim_id)
+        if row["status"] != "waiting":
+            raise HTTPException(409, f"Claim {claim_id} is not waiting in the queue")
+        connection.execute(
+            "UPDATE claims SET status = 'in_progress' WHERE claim_id = ?", (claim_id,)
+        )
+        connection.commit()
+    reply = agent.run(claim_id, claim_id)
+    return {"reply": reply}
+
+
 @app.post("/api/claims/{claim_id}/steps", operation_id="add_step")
 def add_step(claim_id: str, step: Step) -> dict[str, str]:
     """Record one step of the agent's work on a claim."""
@@ -223,13 +239,13 @@ def pay_claim(claim_id: str, payment: Payment) -> dict:
             raise HTTPException(409, f"Claim {claim_id} has already been paid")
         if payment.amount > row["payout"]:
             raise HTTPException(
-                409, f"Claim {claim_id} was approved for ${row['payout']:.2f}"
+                409, f"Claim {claim_id} was approved for ${row['payout']:,.2f}"
             )
         limit = payout_limit(connection)
         if payment.amount > limit and row["signed_off_by"] is None:
             raise HTTPException(
                 403,
-                f"The payout on claim {claim_id} is over the ${limit:.2f}"
+                f"The payout on claim {claim_id} is over the ${limit:,.2f}"
                 " approval limit and needs a handler's sign-off",
             )
         connection.execute(

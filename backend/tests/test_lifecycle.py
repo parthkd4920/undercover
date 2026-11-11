@@ -180,6 +180,29 @@ def test_paying_after_a_sign_off_cannot_pay_twice():
     assert "already been paid" in response.json()["detail"]
 
 
+def test_run_agent(monkeypatch):
+    def fake_run(claim_id: str, thread_id: str, llm=None) -> str:
+        assert (claim_id, thread_id) == ("CLM-1018", "CLM-1018")
+        return "Claim CLM-1018 approved."
+
+    monkeypatch.setattr("agent.main.run", fake_run)
+    response = client.post("/api/claims/CLM-1018/run")
+    assert response.status_code == 200
+    assert response.json() == {"reply": "Claim CLM-1018 approved."}
+    assert client.get("/api/claims/CLM-1018").json()["status"] == "in_progress"
+
+
+def test_run_agent_on_a_claim_that_is_not_waiting():
+    decide("CLM-1019", "approve", 100.0)
+    response = client.post("/api/claims/CLM-1019/run")
+    assert response.status_code == 409
+    assert "not waiting" in response.json()["detail"]
+
+
+def test_run_agent_on_an_unknown_claim():
+    assert client.post("/api/claims/CLM-9999/run").status_code == 404
+
+
 def test_steps_are_listed_in_order():
     assert add_step("CLM-1017", "Read claim CLM-1017").status_code == 200
     add_step("CLM-1017", "Read the policy wording")

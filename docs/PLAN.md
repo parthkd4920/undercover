@@ -103,11 +103,11 @@ Operations `add_step`, `decide_claim`, `pay_claim` and `sign_off_claim`, with th
 
 Rewrite `agent/main.py`: fetch the instructions from `get_agent_instructions` and use them as the system prompt; the eight tools over the backend API, each recording a step on the claim; tool errors returned to the model as text. Write `backend/instructions.md` to the design above: work like a handler, decide under the policy wording alone, calculate payouts by its rules, explain in two or three sentences with the policy section, pay within the limit and leave larger payouts for sign-off. Add `run_agent` to the backend, which sets the claim `in_progress`, calls `agent.run(claim_id, claim_id)` and returns the reply.
 
-- [ ] Tests with a stub model scripting the tool calls: the agent reads a claim, policy, customer, plan, add-ons and wording, decides approve with payout 420 and pays; the claim ends `decided` and paid, and `list_steps` shows the steps in order
-- [ ] Tests with a stub model: an approval of 2000 leaves the claim `waiting_for_sign_off`, and the blocked `pay_claim` returns the sign-off message to the model
-- [ ] Tests: `run_agent` on a waiting claim returns the agent's reply; running it on a claim that is not waiting returns an error
-- [ ] `npm run check:python` passes with coverage at 80% or more
-- [ ] Live check with `npm run dev` and the Playwright MCP server, with `OPENROUTER_API_KEY` set: run the agent on CLM-1001 from the queue, then `curl http://127.0.0.1:8000/api/claims/CLM-1001` shows a decision with a reason and a policy reference, and the claim is decided and paid
+- [x] Tests with a stub model scripting the tool calls: the agent reads a claim, policy, customer, plan, add-ons and wording, decides approve with payout 420 and pays; the claim ends `decided` and paid, and `list_steps` shows the steps in order
+- [x] Tests with a stub model: an approval of 2000 leaves the claim `waiting_for_sign_off`, and the blocked `pay_claim` returns the sign-off message to the model
+- [x] Tests: `run_agent` on a waiting claim returns the agent's reply; running it on a claim that is not waiting returns an error
+- [x] `npm run check:python` passes with coverage at 80% or more
+- [x] Live check with `OPENROUTER_API_KEY` set: run the agent on CLM-1001 through the run operation on a running backend, then `curl http://127.0.0.1:8000/api/claims/CLM-1001` shows a decision with a reason and a policy reference, and the claim is decided and paid (approved at $420, referencing sections 3, 10 and 12); running it from the queue is checked in the browser in Phase 5
 
 ## Phase 5: the dashboard's queue
 

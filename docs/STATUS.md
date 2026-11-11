@@ -10,6 +10,9 @@ The pilot build, from `docs/PLAN.md`. Phase 1 of 6 is done: the backend has its 
 - `backend/schemas.py`: the request bodies, all fields required
 - `backend/instructions.md`: the agent's instructions, served read-only by the API
 
+- `agent/main.py`: the UnderCover Agent. `run(claim_id, thread_id)` fetches its instructions from the backend, then works the claim with tools that read and act only through the backend's API: `get_claim`, `get_policy`, `get_customer`, `get_plan`, `list_add_ons`, `get_policy_wording`, `decide_claim` and `pay_claim`. Each tool records a step on the claim, so the dashboard can follow the work as it happens. Tool errors, such as a payment blocked over $1,000, come back to the model as text.
+- `backend/main.py` also runs the agent: `POST /api/claims/{claim_id}/run` sets the claim `in_progress` and returns the agent's reply. The agent runs on `openai/gpt-6-luna` with low reasoning effort, or the model in `MODEL_NAME`.
+
 A claim moves `waiting` → `in_progress` → `decided`, or `waiting_for_sign_off` → `decided` when a handler signs off. The $1,000 rule is enforced by the backend, not the agent's instructions.
 
 ## How to run it
@@ -18,4 +21,4 @@ A claim moves `waiting` → `in_progress` → `decided`, or `waiting_for_sign_of
 
 ## Pending
 
-- Phases 4 to 6 of the plan: the agent, and the dashboard
+- Phases 5 and 6 of the plan: the dashboard
