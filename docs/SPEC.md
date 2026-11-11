@@ -30,10 +30,14 @@ Our goal is to handle claims straight through, as accurately as our handlers do.
 ## Rules
 
 - A payout over $1,000 needs a handler's sign-off. The agent can approve such a claim, but the payment waits until a handler signs off. The system must block the payment until then, even if the agent tries to pay.
-- An undecided run still in progress after two minutes is retried automatically, without overlapping active agent work. There are three attempts total; a third stale attempt is referred to a human. Saved decisions and payments are not overwritten by retries.
+- A timed, undecided, unpaid run still in progress at least two minutes after its latest attempt started is retried automatically once the active worker has stopped. Each retry starts a new two-minute window. There are three attempts total: the initial run and two reruns. If the third attempt is stale, refer the claim to a human with an explanation instead of starting a fourth attempt. Saved decisions and payments are not overwritten by retries.
 - Decisions follow the policy wording.
 - Our handlers' own decisions on these claims are in `data/evals/`. We use them to check the agent's work. The agent must never see them.
 - Amounts are in US dollars.
+
+## Human referrals
+
+A claim can reach human review because the agent cannot confidently settle it under the supplied policy, or because three timed attempts have remained unresolved. A referral is not a denial and does not make a payment. The handler must be able to read the referral reason, review the evidence, and approve or deny with a reason and policy reference. The original referral and the final reviewer must remain recorded. Any approval still follows the $1,000 payment-authority rule.
 
 ## Our records
 
@@ -45,3 +49,5 @@ Everything is in `data/`, described in `data/README.md`: the claims queue, the p
 - No sign-in. Everyone who uses the screens sees everything.
 - No real payments.
 - No messages to customers.
+
+Implementation and delivered changes are recorded in [STATUS.md](STATUS.md) and [CHANGELOG.md](CHANGELOG.md).

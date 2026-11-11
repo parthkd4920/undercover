@@ -4,6 +4,17 @@ From `docs/SPEC.md`. The pilot gives UnderCover a claims platform: a backend ove
 
 Out of scope, per the spec: the claims manual, sign-in, real payments, messages to customers. The answer key in `data/evals/` is never read by the agent and is not part of this build; checking the agent's accuracy against it comes later.
 
+## Current delivered workflow
+
+The November 11–12, 2026 changes are summarized in [CHANGELOG.md](CHANGELOG.md); [STATUS.md](STATUS.md) describes the current architecture and behavior.
+
+- One Run agent click processes the current waiting queue sequentially. The former single-claim selector and concurrent batch execution are superseded.
+- Uncertain claims go to human review, where a handler can approve or deny while retaining the original referral and reviewer record.
+- A timed, undecided, unpaid attempt becomes eligible for automatic recovery after two minutes, when no worker is active. There are three attempts total; a third stale attempt is referred to a human instead of running a fourth time.
+- Saved decisions/payments and legacy claims without a trustworthy start time are excluded from automatic reruns. The backend continues to enforce over-limit payment sign-off.
+
+The historical phase descriptions and check results below record the build at each stage. Where they describe the old execution or recovery behavior, the current delivered workflow above and the final recovery section take precedence.
+
 ## Design
 
 ### Claim state machine
@@ -32,7 +43,8 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 | `list_claims` | The queue: claim id, type, summary, customer name, amount claimed, status, decision and payout |
 | `get_claim` | One claim in full: story, items, documents, status, decision, payout, reason, policy reference, sign-off and payment |
 | `list_steps` | The agent's steps on a claim, in order |
-| `run_agent` | Set a claim `in_progress` and run the agent on it; returns the agent's final reply |
+| `run_agent` | Start a timed first attempt on a waiting claim; returns the agent's final reply |
+| `rerun_agent` | Retry an eligible stale attempt, or refer it to a human after three attempts |
 | `decide_claim` | Record decision (approve, decline, refer), payout, reason and policy reference; sets the status |
 | `pay_claim` | Pay an approved claim; takes the amount; blocked over $1,000 without sign-off |
 | `sign_off_claim` | An eligible handler signs off an over-limit approval; payment sets the claim approved |

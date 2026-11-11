@@ -7,3 +7,9 @@
 - `data/`: the business data the backend starts from. The agent never sees `data/evals/`, which holds the answer key.
 
 Python 3.12 with uv, all in the root `pyproject.toml`. Node 26. The OpenRouter key is `OPENROUTER_API_KEY` in `.env`.
+
+## Pilot execution and recovery
+
+The dashboard submits the waiting queue sequentially through the existing run API. `backend/recovery.py` serializes agent execution in one backend process and runs a watchdog during the FastAPI lifespan. SQLite persists each attempt's start time and count. The watchdog checks every five seconds, retries eligible undecided/unpaid attempts after two minutes, and refers a third stale attempt to a human. This is local pilot coordination, not a distributed job scheduler.
+
+The model client has a 30-second request timeout and no SDK retries. A 90-second budget is checked before model turns; an active call must finish or time out before a new worker starts. See [STATUS.md](STATUS.md) for the recovery API and exclusions.

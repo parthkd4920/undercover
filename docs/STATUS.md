@@ -1,6 +1,16 @@
 # Status
 
-The pilot and the explicit-outcome/human-review change in `docs/PLAN.md` are implemented. Claims have six statuses: `waiting`, `in_progress`, `waiting_for_sign_off`, `waiting_for_human_review`, `approved`, and `declined`.
+The pilot, sequential queue processing, human review and automatic stale-run recovery are implemented. See [CHANGELOG.md](CHANGELOG.md) for the November 11–12 session changes and [PLAN.md](PLAN.md) for implementation history. Claims have six statuses: `waiting`, `in_progress`, `waiting_for_sign_off`, `waiting_for_human_review`, `approved`, and `declined`.
+
+## Current workflow
+
+1. Click Run agent once to process the current waiting queue automatically, one claim at a time. Individual failures do not stop the remaining claims.
+2. Clear policy outcomes are approved and paid, declined, or held for over-limit sign-off. Uncertain cases go to human review with their referral explanation preserved.
+3. An undecided, unpaid timed attempt still in progress after two minutes becomes eligible for automatic recovery. The five-second watchdog waits for the active worker to stop before rerunning it.
+4. There are three attempts total: the initial run and two reruns. If the third attempt becomes stale, the claim is referred to a human; no fourth model attempt is made.
+5. Handlers approve or deny referred claims. The $1,000 payment sign-off rule remains enforced by the backend.
+
+Existing untimed claims, saved decisions and recorded payments are excluded from automatic reruns. Each retry's two-minute window starts from its own recorded start time.
 
 ## Architecture
 
