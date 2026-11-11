@@ -82,11 +82,11 @@ Build `backend/database.py` (SQLite connection, schema, `UNDERCOVER_DB` override
 
 Operations `list_claims`, `get_claim`, `list_steps`, `get_policy`, `get_customer`, `get_plan`, `list_add_ons`, `get_policy_wording` and `get_agent_instructions`, each with an `operation_id`, a one-line docstring and no optional inputs. `backend/instructions.md` holds the agent's instructions.
 
-- [ ] `curl http://127.0.0.1:8000/api/claims` returns 25 claims with `status: "waiting"`, ids from CLM-1001 to CLM-1025
-- [ ] `curl http://127.0.0.1:8000/api/claims/CLM-1001` returns the full claim: story, three items, documents, `policy_id: "POL-2001"`
-- [ ] `curl http://127.0.0.1:8000/api/policies/POL-2001`, `/api/customers/CUS-3001`, `/api/plans/premium`, `/api/add-ons`, `/api/policy-wording` and `/api/agent-instructions` each return their record, and the wording matches `data/policy_wording.md`
-- [ ] `get_claim` on an unknown claim returns 404; tests cover every read operation, including empty steps on an unworked claim
-- [ ] `npm run check:python` passes, with backend coverage at 80% or more
+- [x] `curl http://127.0.0.1:8000/api/claims` returns 25 claims with `status: "waiting"`, ids from CLM-1001 to CLM-1025
+- [x] `curl http://127.0.0.1:8000/api/claims/CLM-1001` returns the full claim: story, three items, documents, `policy_id: "POL-2001"`
+- [x] `curl http://127.0.0.1:8000/api/policies/POL-2001`, `/api/customers/CUS-3001`, `/api/plans/premium`, `/api/add-ons`, `/api/policy-wording` and `/api/agent-instructions` each return their record, and the wording matches `data/policy_wording.md`
+- [x] `get_claim` on an unknown claim returns 404; tests cover every read operation, including empty steps on an unworked claim
+- [x] `npm run check:python` passes, with backend coverage at 80% or more
 
 ## Phase 3: the claim lifecycle
 

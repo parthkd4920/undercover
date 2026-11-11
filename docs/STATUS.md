@@ -6,7 +6,8 @@ The pilot build, from `docs/PLAN.md`. Phase 1 of 6 is done: the backend has its 
 
 - `backend/database.py`: the schema and a connection per call, at `undercover.db` or the path in `UNDERCOVER_DB`
 - `backend/seed.py`: fills an empty database from the six record files in `data/` (never `evals/`, `security/` or the claims manual); the queue's claims seed as `waiting`
-- `backend/main.py`: seeds on startup when the database is empty, and `GET /api/health`
+- `backend/main.py`: seeds on startup, `GET /api/health`, and the read operations: `list_claims`, `get_claim`, `list_steps`, `get_policy`, `get_customer`, `get_plan`, `list_add_ons`, `list_handlers`, `get_policy_wording`, `get_agent_instructions`
+- `backend/instructions.md`: the agent's instructions, served read-only by the API
 
 ## How to run it
 
@@ -14,4 +15,4 @@ The pilot build, from `docs/PLAN.md`. Phase 1 of 6 is done: the backend has its 
 
 ## Pending
 
-- Phases 2 to 6 of the plan: the read API, the claim lifecycle, the agent, and the dashboard
+- Phases 3 to 6 of the plan: the claim lifecycle, the agent, and the dashboard
