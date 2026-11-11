@@ -17,8 +17,9 @@ def main():
         with closing(database.connect()) as connection:
             seed.seed(connection)
             connection.execute(
-                "UPDATE claims SET status = 'in_progress' WHERE claim_id = 'CLM-1004'"
+                "UPDATE claims SET status = 'in_progress' WHERE claim_id BETWEEN 'CLM-1004' AND 'CLM-1010'"
             )
+            connection.execute("UPDATE handlers SET can_approve_over_limit=0 WHERE handler_id='HND-03'")
             connection.commit()
         uvicorn.run("backend.main:app", host="127.0.0.1", port=18000)
 

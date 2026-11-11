@@ -204,3 +204,19 @@ def test_openapi_operations_require_all_review_inputs():
         )
         fields = schema["components"]["schemas"][body]
         assert set(fields["required"]) == set(fields["properties"])
+
+
+@pytest.mark.parametrize("field", ["reason", "reference"])
+def test_blank_referral_text_changes_nothing(field):
+    start_claim()
+    body = {"reason": REASON, "reference": REFERENCE} | {field: "   "}
+    assert client.post("/api/claims/CLM-1001/refer", json=body).status_code == 422
+    assert client.get("/api/claims/CLM-1001").json()["decision"] is None
+    assert client.get("/api/claims/CLM-1001/steps").json() == []
+
+
+def test_recorded_approval_cannot_be_referred():
+    start_claim()
+    client.post("/api/claims/CLM-1001/decide", json=REVIEW)
+    assert refer().status_code == 409
+    assert client.get("/api/claims/CLM-1001").json()["decision"] == "approve"

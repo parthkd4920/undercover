@@ -22,7 +22,7 @@ test("an approval over the limit is signed off on the claim page and paid", asyn
   await expect(page.getByText("Waiting for sign-off")).toBeVisible();
   await page.getByLabel("Handler").selectOption({ label: "Dana Whitfield" });
   await page.getByRole("button", { name: "Sign off" }).click();
-  await expect(page.getByText("Decided")).toBeVisible();
+  await expect(page.getByText("Approved")).toBeVisible();
   await expect(page.getByText(/Paid \$[\d,]+\.\d\d on/)).toBeVisible();
   await expect(page.getByText("Signed off by Dana Whitfield")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign off" })).toHaveCount(0);
@@ -30,7 +30,7 @@ test("an approval over the limit is signed off on the claim page and paid", asyn
     `http://127.0.0.1:18000/api/claims/${claimId}`,
   );
   expect(await result.json()).toMatchObject({
-    status: "decided",
+    status: "approved",
     paid_amount: 2000,
     signed_off_by: "HND-01",
   });

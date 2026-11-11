@@ -8,15 +8,15 @@ Out of scope, per the spec: the claims manual, sign-in, real payments, messages 
 
 ### Claim state machine
 
-A claim moves through the four states the team needs to see:
+A claim moves through six explicit states:
 
 - `waiting` — in the queue, nobody working it
 - `in_progress` — the agent is working it
 - `waiting_for_sign_off` — the agent approved a payout over $1,000; payment is blocked until a handler signs off
 - `waiting_for_human_review` — the agent is facing difficulty to confidently approve or deny a claim or the case is outside the scope of the policies so agent refers to a human to approve or deny.
-- `approved` — the agent has decided and approved within the limit and paid.
-- `declined` - the agent has read the claim and after reviewing it against the policy declined it.
-Transitions: `waiting` → `run_agent` → `in_progress` → `decide_claim` → `approved` or `declined` (approve up to the limit, decline or refer) or `waiting_for_sign_off` (approve over the limit) → handler signs off, which pays the approved payout → `decided` or `waiting_for_human_review` → refers to a human agent and waits for decision → `approved` or `declined`.
+- `approved` — final approval with payment recorded by the agent or an authorized handler.
+- `declined` — the agent or handler denied coverage under the policy, without payment.
+Transitions: `waiting` → `in_progress`. A clear decline becomes `declined`; uncertainty becomes `waiting_for_human_review`. A within-limit approval stays `in_progress` until payment makes it `approved`. An over-limit approval waits in `waiting_for_sign_off` until an eligible handler signs off and pays it. Human resolution denies without payment or approves and pays when authorized; an over-limit approval by a reviewer without authority waits for a separate sign-off. The detailed transition table and new verification criteria are in the change-plan section below.
 
 ### Backend
 
@@ -35,8 +35,9 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 | `run_agent` | Set a claim `in_progress` and run the agent on it; returns the agent's final reply |
 | `decide_claim` | Record decision (approve, decline, refer), payout, reason and policy reference; sets the status |
 | `pay_claim` | Pay an approved claim; takes the amount; blocked over $1,000 without sign-off |
-| `sign_off_claim` | A handler signs off an over-limit approval; the payout is then paid and the claim is decided |
-| `refer_human` | agent refers to a Human handler to approve or deny which then would result in immediate approval or refusal by the Handler |
+| `sign_off_claim` | An eligible handler signs off an over-limit approval; payment sets the claim approved |
+| `refer_human` | Record uncertainty and wait for a human handler, without payment |
+| `resolve_human_review` | Record a handler decision, preserving the referral; pay approvals when authorized |
 | `add_step` | Record one step of the agent's work on a claim |
 | `get_policy` | One policy: plan, add-ons, purchase date, trip, travelers |
 | `get_customer` | One customer: contact details and claim history |
@@ -53,7 +54,7 @@ The agent's instructions live in `backend/instructions.md`, served by `get_agent
 
 `agent/main.py` keeps the one entry point `run(claim_id, thread_id)`. On each run it fetches its instructions from the backend API and uses them as the system prompt. It reads everything and acts only through the backend's API, using these tools, each of which records a step on the claim so the team can follow the work:
 
-`get_claim`, `get_policy`, `get_customer`, `get_plan`, `list_add_ons`, `get_policy_wording`, `decide_claim`, `pay_claim`.
+`get_claim`, `get_policy`, `get_customer`, `get_plan`, `list_add_ons`, `get_policy_wording`, `decide_claim`, `pay_claim`, `refer_human`.
 
 The instructions tell the agent to work like a handler: read the claim, the policy, the customer's claim history, the plan limits, the add-ons and the policy wording; decide approve, decline or refer strictly under the wording; work out the payout by the wording's calculation rules; explain the decision in two or three sentences with the policy section it rests on; and pay an approval itself only when the payout is within the $1,000 limit, leaving larger payouts for a handler's sign-off.
 
@@ -61,15 +62,19 @@ The dashboard triggers the agent through `run_agent` on the backend, which calls
 
 ### Dashboard
 
-React with Vite and TypeScript, hash routes, no router dependency. Brand per `docs/BRAND.md`: Instrument Sans for headings and body, Instrument Serif for the tagline, JetBrains Mono for ids, numbers and money; panels rounded with no outline; light and dark modes via `prefers-color-scheme`. The four claim states use Sea Green (`decided`), Marigold (`in_progress`), Coral (`waiting_for_sign_off`) and Cerulean (`waiting`), with Midnight text on the first three and white on Cerulean.
+React with Vite and TypeScript, hash routes, no router dependency. Brand per `docs/BRAND.md`: Instrument Sans for headings and body, Instrument Serif for the tagline, JetBrains Mono for ids, numbers and money; panels rounded with no outline; light and dark modes via `prefers-color-scheme`. The six claim states use Sea Green (`approved`), Raspberry (`declined`), Marigold (`in_progress`), Coral (`waiting_for_sign_off` and `waiting_for_human_review`) and Cerulean (`waiting`), always with text labels. Raspberry and Cerulean have white text; the others have Midnight text.
 
-- `#/` the queue: every claim with its status, amount and a Run agent button on the top; refreshed while the agent works.
+- `#/` the queue: every claim with its status, amount and a top Run agent button for one selected waiting claim; refreshed while the agent works.
 - `#/claims/{id}` the claim in full: story, items, documents, the customer and policy, the agent's steps as they happen (polled while the claim is in progress), the decision with payout, reason and policy reference, payment, and a sign-off with a handler choice on claims waiting for sign-off and approve or deny buttons on the claims referred to human to decide.
 - `#/agent` the agent's instructions, read only
 
 ### Testing
 
 Unit tests never call a model: backend tests use FastAPI's `TestClient` against a fresh seeded database; agent tests script a stub model (`GenericFakeChatModel`) through the tool calls, as the skeleton's `agent/tests/test_agent.py` already does. The dashboard is tested with vitest and Testing Library with stubbed `fetch`; Playwright covers the pages end to end, arranging claim state through the backend API where needed.
+
+## Historical pilot implementation
+
+The following pilot and completion phases record the earlier build. Their references to the old status model are historical; the active outcome/referral contract and new checks are in the change plan.
 
 ## Phase 1: the backend's database and seed
 
@@ -98,7 +103,7 @@ Operations `add_step`, `decide_claim`, `pay_claim`,`refer_human`, and `sign_off_
 - [x] Tests: deciding with payout 2000 sets `waiting_for_sign_off`, and `pay_claim` of 2000 returns an error whose `detail` says the payout needs a handler's sign-off
 - [x] Tests: after `sign_off_claim` with a handler who `can_approve_over_limit`, the claim is `approved` with `paid_amount` 2000, `signed_off_by` and `paid_on` set
 - [x] Tests: `pay_claim` refuses a claim that is not approved, an amount over the approved payout, a claim already paid, and a handler without `can_approve_over_limit` signing off; `decide_claim` refuses a claim that is already decided, so a test can arrange a claim without calling a model
-- [ ] Tests: setting `waiting_for_human_review` initiates having approve or deny buttons and upon approve the status is `approved` and payout is done and deny sets the status as `declined` and no payout is done.
+- [x] Tests: setting `waiting_for_human_review` initiates having approve or deny buttons and upon approve the status is `approved` and payout is done and deny sets the status as `declined` and no payout is done.
 - [x] Tests: `add_step` then `list_steps` returns the steps in order
 - [x] `npm run check:python` passes with coverage at 80% or more
 
@@ -198,9 +203,9 @@ Final verification: `npm run check` passed with 58 Python tests (99.67% coverage
 
 ## Change plan: explicit outcomes and human review
 
-This section plans the student's revised requirements. It supersedes conflicting status and referral behavior in the earlier design; earlier checked boxes record the previous pilot build, not completion of these changes. All criteria below remain pending. No product code has been changed for this plan.
+This section implements the student's revised requirements. It supersedes conflicting status and referral behavior in the earlier design; earlier checked boxes record the previous pilot build, not completion of these changes. The student authorized implementation; verified criteria are checked below.
 
-### What the code does today
+### Baseline before this change
 
 The backend uses `decided` for approved, declined and referred claims. The agent already knows to refer ambiguous claims through `decide_claim(decision="refer")`, but that records a terminal decision. There is no referral endpoint, handler decision endpoint, reviewer audit record or review form. The dashboard's types, chips, fixtures and browser tests all assume the old statuses. Existing SQLite databases retain their records across startup, so changing the seed alone would leave old claims incompatible with the new dashboard.
 
@@ -285,11 +290,13 @@ The revised queue paragraph also moves Run agent to the top. Proposed scope is o
 
 Extend the isolated Playwright fixtures and browser suite. Reconcile the active design at the top of this document, the changed acceptance criteria and `docs/STATUS.md`. Update the status paragraph in `docs/SPEC.md` to reflect the student's approved requirement, retaining the original policy/payment rules. Keep previous build verification clearly historical; checked boxes are not evidence for an unimplemented requirement.
 
-- [ ] Browser journeys: referral → handler approval → approved and paid; referral → handler denial → declined and unpaid; over-limit human approval without authority → sign-off → approved and paid; direct agent approval/decline continue working using stubbed/prepared records.
-- [ ] Browser assertions verify queue and detail show the same outcome, reviewer and payment amounts are correct, referral reasons survive, and stale review controls disappear after resolution. Tests do not mutate the development database or call a model.
-- [ ] Inspect updated queue chips and review/sign-off forms in light/dark mode at desktop and phone widths; check keyboard navigation, visible focus, error messages and long referral explanations using Playwright MCP if available, or record the browser substitution used.
-- [ ] `npm run check` passes in full without lowering thresholds or disabling rules. Repeat the isolated browser suite to confirm clean setup.
-- [ ] Update `docs/STATUS.md` with migration behavior, endpoints, six statuses, human-review/sign-off distinctions, tests and remaining limitations. In particular, there is still no sign-in, authenticated reviewer identity, durable graph or automatic failed-run recovery.
-- [ ] Implement and commit each phase with hooks enabled, preserving unrelated student edits; never push. Check off this section only after its new criteria are verified.
+- [x] Browser journeys: referral → handler approval → approved and paid; referral → handler denial → declined and unpaid; over-limit human approval without authority → sign-off → approved and paid; direct agent approval/decline continue working using stubbed/prepared records.
+- [x] Browser assertions verify queue and detail show the same outcome, reviewer and payment amounts are correct, referral reasons survive, and stale review controls disappear after resolution. Tests do not mutate the development database or call a model.
+- [x] Inspect updated queue chips and review/sign-off forms in light/dark mode at desktop and phone widths; check keyboard navigation, visible focus, error messages and long referral explanations using Playwright MCP if available, or record the browser substitution used.
+- [x] `npm run check` passes in full without lowering thresholds or disabling rules. Repeat the isolated browser suite to confirm clean setup.
+- [x] Update `docs/STATUS.md` with migration behavior, endpoints, six statuses, human-review/sign-off distinctions, tests and remaining limitations. In particular, there is still no sign-in, authenticated reviewer identity, durable graph or automatic failed-run recovery.
+- [x] Implement and commit each phase with hooks enabled, preserving unrelated student edits; never push. Check off this section only after its new criteria are verified.
 
-Planning handoff: review this change plan before implementation. No database has been migrated, no claim has been changed, and no later course build is included.
+Implementation handoff: the five phases were implemented in order. Migration was verified on temporary legacy databases, and browser journeys use disposable records without model calls. Existing development records upgrade on their next backend database connection. No later course build is included.
+
+Outcome/review verification: `npm run check` passed with 89 Python tests (99.30% coverage), 47 dashboard tests (96.12% statement coverage), and 21 browser tests. The expanded browser suite passed on two consecutive clean setups. Playwright Chromium screenshots were inspected directly because no Playwright MCP server is available: queue, review errors and controls, long referral explanations and sign-off focus are readable in light/dark mode at 1440px and 390px. All five phases were committed with hooks enabled; unrelated student edits were preserved and nothing was pushed.

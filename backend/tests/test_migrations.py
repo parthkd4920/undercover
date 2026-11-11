@@ -49,6 +49,12 @@ def old_database(path):
 def test_startup_migrates_legacy_records_idempotently(tmp_path, monkeypatch):
     path = tmp_path / "legacy.db"
     old_database(path)
+    with closing(sqlite3.connect(path)) as original:
+        original.row_factory = sqlite3.Row
+        before = [
+            dict(row)
+            for row in original.execute("SELECT * FROM claims ORDER BY claim_id")
+        ]
     monkeypatch.setenv("UNDERCOVER_DB", str(path))
     with TestClient(app) as client:
         claims = [client.get(f"/api/claims/CLM-100{i}").json() for i in range(1, 7)]
@@ -76,6 +82,14 @@ def test_startup_migrates_legacy_records_idempotently(tmp_path, monkeypatch):
             client.get(f"/api/claims/CLM-100{i}").json() for i in range(1, 7)
         ] == claims
     with closing(database.connect()) as connection:
+        after = [
+            dict(row)
+            for row in connection.execute("SELECT * FROM claims ORDER BY claim_id")
+        ]
+        for old, updated in zip(before, after, strict=True):
+            for key, value in old.items():
+                if key not in {"status", "decided_on"}:
+                    assert updated[key] == value
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM policies").fetchone()[0] == 50
 

@@ -5,7 +5,9 @@ test("the queue lists the claims with where each stands", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Claims" })).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(25);
   await expect(page.locator(".chip").first()).toBeVisible();
-  await expect(page.getByText("Maya Patel").first()).toBeVisible();
+  await expect(
+    page.getByText("Maya Patel", { exact: true }).first(),
+  ).toBeVisible();
 });
 
 test("a claim opens from the queue", async ({ page }) => {

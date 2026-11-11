@@ -86,6 +86,7 @@ export function DecisionPanel(props: DecisionPanelProps) {
           <label>
             Handler
             <select
+              aria-label="Handler"
               value={props.choice}
               onChange={(event) => {
                 props.onChoice(event.target.value);

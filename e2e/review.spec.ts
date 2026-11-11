@@ -74,7 +74,7 @@ test("all claim outcomes have accurate labels and sign-off is keyboard accessibl
     },
     {
       name: "paid",
-      status: "decided",
+      status: "approved",
       decision: "approve",
       payout: 420,
       paid_amount: 420,
@@ -83,7 +83,7 @@ test("all claim outcomes have accurate labels and sign-off is keyboard accessibl
     },
     {
       name: "declined",
-      status: "decided",
+      status: "declined",
       decision: "decline",
       payout: 0,
       paid_amount: null,
@@ -92,12 +92,12 @@ test("all claim outcomes have accurate labels and sign-off is keyboard accessibl
     },
     {
       name: "referred",
-      status: "decided",
+      status: "waiting_for_human_review",
       decision: "refer",
       payout: 0,
       paid_amount: null,
       paid_on: null,
-      label: "Refer",
+      label: "Awaiting human decision",
     },
   ];
   for (const state of states) {
@@ -106,6 +106,10 @@ test("all claim outcomes have accurate labels and sign-off is keyboard accessibl
         json: {
           ...(original as object),
           ...state,
+          referral_reason:
+            "Evidence conflicts with the claim story; a handler must assess the documents before confirming coverage.",
+          referral_reference: "Section 3; applicability needs review",
+          referred_on: "2026-11-11",
           reason:
             "The documents support this decision under the policy wording.",
           reference: "Section 3",
@@ -152,3 +156,67 @@ test("all claim outcomes have accurate labels and sign-off is keyboard accessibl
     page.getByRole("link", { name: "Agent instructions" }),
   ).toBeFocused();
 });
+
+for (const colorScheme of ["light", "dark"] as const) {
+  for (const width of [1440, 390]) {
+    test(`human review fits ${String(width)}px in ${colorScheme}`, async ({
+      page,
+      request,
+    }, testInfo) => {
+      await page.emulateMedia({ colorScheme });
+      await page.setViewportSize({ width, height: 900 });
+      const response = await request.get(
+        "http://127.0.0.1:18000/api/claims/CLM-1001",
+      );
+      const original: unknown = await response.json();
+      const reason =
+        "The receipt and airline statement disagree about the incident dates. The applicable section does not clearly settle the conflicting evidence; a handler must establish the covered dates before calculating a payout.";
+      await page.route("**/api/claims/CLM-1001", async (route) => {
+        await route.fulfill({
+          json: {
+            ...(original as object),
+            status: "waiting_for_human_review",
+            decision: "refer",
+            referral_reason: reason,
+            referral_reference: "Section 3; applicability unclear",
+            referred_on: "2026-11-11",
+          },
+        });
+      });
+      await page.goto("/#/claims/CLM-1001");
+      await expect(page.getByText(reason, { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Approve", exact: true }).click();
+      await expect(page.getByRole("alert")).toContainText(
+        "reason and policy reference",
+      );
+      await page.getByLabel("Reviewing handler").selectOption("HND-03");
+      await page.getByLabel("Payout (USD)").fill("2000");
+      await page
+        .getByLabel("Decision reason")
+        .fill("The documents establish the eligible expenses.");
+      await page
+        .getByLabel("Policy reference", { exact: true })
+        .fill("Section 3");
+      await expect(
+        page.getByText(/will wait for an authorized handler/),
+      ).toBeVisible();
+      await page.getByLabel("Policy reference", { exact: true }).focus();
+      await page.keyboard.press("Tab");
+      await expect(
+        page.getByRole("button", { name: "Approve", exact: true }),
+      ).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: "Approve", exact: true }),
+      ).toHaveCSS("outline-style", "solid");
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(width);
+      await page
+        .locator(".review-form")
+        .screenshot({ path: testInfo.outputPath("human-review.png") });
+      await page
+        .locator(".referral")
+        .screenshot({ path: testInfo.outputPath("referral.png") });
+    });
+  }
+}

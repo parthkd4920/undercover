@@ -1,53 +1,44 @@
 # Status
 
-The claims pilot in `docs/PLAN.md` is complete, including the five completion phases identified during the November 11, 2026 review. The backend, agent, queue, claim detail and read-only instructions pages are implemented.
+The pilot and the explicit-outcome/human-review change in `docs/PLAN.md` are implemented. Claims have six statuses: `waiting`, `in_progress`, `waiting_for_sign_off`, `waiting_for_human_review`, `approved`, and `declined`.
 
-## Architecture and features
+## Architecture
 
-- `backend/database.py` owns the SQLite schema and opens a connection per call. The default database is `undercover.db`; `UNDERCOVER_DB` overrides its path.
-- `backend/seed.py` fills an empty database from six business-record JSON files: 25 claims, 50 policies, 49 customers, three plans, three add-ons, three handlers and company settings. It never loads the answer key, security records or claims manual. Restarting does not duplicate records.
-- `backend/main.py` is the FastAPI application. Startup seeds the database. Read operations serve the queue, full claims, ordered steps, policies, customers, plans, add-ons, handlers, policy wording and agent instructions. The health endpoint is `/api/health`; interactive API documentation is at `/docs` on the backend.
-- Claim operations run the agent, record steps, decide, pay and sign off. Decisions require an `in_progress` claim and cannot overwrite a recorded decision. Approvals above $1,000 enter `waiting_for_sign_off`. Every payment against such an approval requires sign-off, even if the requested amount is $1,000 or less. Sign-off requires an eligible handler, pays the approved payout and records the signer and date. Duplicate payments and payments above the approved payout are refused. `backend/schemas.py` requires all request fields and rejects negative or non-finite money values.
-- `backend/instructions.md` holds the instructions served read only to both the agent and dashboard. The backend serves `data/policy_wording.md` as the contract for decisions.
-- `agent/main.py` exposes `run(claim_id, thread_id)` and uses LangChain's `create_agent` with OpenRouter. It fetches instructions on each run and reads and acts exclusively through the backend API. Its eight tools read the claim, policy, customer history, plan, add-ons and wording, then decide and pay. Each tool records a step; backend errors return to the model as text. The default model is `openai/gpt-6-luna` with low reasoning effort; `MODEL_NAME` overrides it. The backend's run operation uses the claim id as the thread id.
-- `dashboard/src/App.tsx` selects pages through hash routes. `src/lib/api.ts` supplies typed API calls. The dashboard follows the brand fonts and colors, switches themes using the system preference, and supports narrow screens with horizontally scrolling tables and wrapping controls. Links, buttons and handler selection have visible keyboard focus.
+- `backend/database.py` opens SQLite connections at `undercover.db`, or the path in `UNDERCOVER_DB`. `backend/migrations.py` upgrades old databases transactionally and once only using SQLite schema version 1. It adds referral/reviewer fields, maps old `decided` records to their outcome or pending action, preserves business records and activity history, and does not reseed or reset them. Legacy referrals retain their original reason/reference/date and become pending human reviews. Unpaid approvals remain in progress or wait for sign-off. An inconsistent legacy record that cannot be mapped reports its claim id and rolls back the upgrade.
+- `backend/seed.py` fills an empty database from six business-record JSON files: 25 claims, 50 policies, 49 customers, three plans, three add-ons, three handlers and company settings. It never loads `data/evals/`, security records or the claims manual.
+- `backend/main.py` exposes FastAPI read operations for the queue, claims, ordered steps, policies, customers, plans, add-ons, handlers, policy wording and agent instructions. Health is `/api/health`; interactive API documentation is at `/docs`. Request bodies are in `backend/schemas.py`, with all fields required, nonblank decision/referral explanations and finite nonnegative amounts. Only approvals may carry nonzero payouts.
+- `backend/lifecycle.py` handles decisions, payments, referrals, human resolution and sign-off under SQLite write transactions. Reviewer, decision, payment/sign-off and activity are committed together. Competing reviews resolve once; invalid or failed operations leave no partial decision or payment.
+- `agent/main.py` exposes `run(claim_id, thread_id)`, using LangChain's `create_agent` through OpenRouter. It fetches `backend/instructions.md` through the API and uses nine API-only tools: claim, policy, customer, plan, add-ons, wording, decision, payment and `refer_human`. Clear policy outcomes stay automatic; missing evidence, conflicting accounts or unresolved applicability are referred with an actionable explanation. Instructions require the agent to stop after referral; human resolution is not exposed as an agent tool. The default model is `openai/gpt-6-luna` with low reasoning effort, or `MODEL_NAME` when set.
+- `dashboard/src/App.tsx` selects hash routes, backed by the typed client in `src/lib/api.ts`. Components separate claim content, recorded decisions/sign-off and human review. Brand themes follow the system preference; tables scroll horizontally on narrow screens and controls have visible keyboard focus.
+
+## Claim lifecycle and human review
+
+Running a waiting claim sets `in_progress`. A clear denial becomes `declined` without payment. A within-limit approval records its decision and remains `in_progress` until the separate payment operation succeeds and sets `approved`. The page displays Approval recorded, payment pending in between. An approval above $1,000 waits for an eligible handler's sign-off; signing off records the signer, pays it, and sets `approved`.
+
+`POST /api/claims/{id}/refer` (`refer_human`) accepts a reason and policy reference on an undecided running claim. It records the handoff as `waiting_for_human_review`, without payment or a final-decision timestamp. The old `decide_claim` refer option delegates to the same behavior and requires zero payout.
+
+`POST /api/claims/{id}/human-review` (`resolve_human_review`) accepts a handler, approve/decline decision, payout, reason and reference. A denial sets `declined` with no payment. A within-limit human approval pays immediately. An over-limit approval pays immediately only if the reviewer has `can_approve_over_limit`; otherwise it waits for another eligible handler's sign-off. Payment checks use the approved payout, so a smaller requested payment cannot bypass sign-off. Duplicate payments and payments above the approved payout are blocked.
+
+Claims retain `referral_reason`, `referral_reference` and `referred_on` separately from the final decision. `reviewed_by` and `reviewed_on` identify the reviewer; `signed_off_by` and `signed_off_on` identify any over-limit payment authorization. Every existing handler can review coverage, but only eligible handlers can authorize over-limit payments. The backend enforces these rules independently of the dashboard.
 
 ## Dashboard routes
 
-- `#/`: all claims with customer, type, date, claimed amount, payout and status. Waiting claims have a Run agent button. The queue refreshes every two seconds and displays load/run errors.
-- `#/claims/{id}`: the story, claimed items, document contents, customer history, policy/trip, ordered agent steps, decision/reason/policy reference, payment and signer. Active claims refresh every two seconds after requests complete and stop polling when finished or unmounted. Changing claims clears the previous page and ignores late responses. Failed supporting requests have visible errors. Over-limit approvals offer only eligible handlers for sign-off, prevent submission while signing, and display sign-off errors. Declines and referrals do not display payment/sign-off messages; an unpaid within-limit approval displays Payment pending.
-- `#/agent`: instructions fetched from the same API used by the agent and rendered as read-only headings, paragraphs and lists. Failed loads display an error.
+- `#/`: queue with customer, type, date, claimed amount, payout and explicit status chips. A top selector and Run agent button work one waiting claim at a time; no batch dispatcher is added. The queue polls every two seconds and displays load/run errors.
+- `#/claims/{id}`: story, items, document contents, customer history, policy/trip, steps, original referral, final reason/reference, reviewer, payment and signer. Referred claims show a handler selector, payout, reason/reference and Approve/Deny buttons; denial always submits zero payout. Sign-off remains a separate control on sign-off claims. Forms report errors and prevent double submission. Running, review and sign-off claims poll after requests complete, allowing another handler's resolution to remove stale controls. Final outcomes stop polling; navigation discards old responses.
+- `#/agent`: the same instructions used by the agent, rendered read only as headings, paragraphs and lists. Failed requests display errors.
 
-A claim moves `waiting` → `in_progress` → `decided`, or `in_progress` → `waiting_for_sign_off` → `decided`. Within-limit approval and payment are separate operations: the decision sets `decided`, and the agent then pays it. The page distinguishes an unpaid approval from a paid one.
+## Run and verify
 
-## How to run
+At the repository root, install with `uv sync` and `npm install`, then run `npm run dev`. The backend is at `http://127.0.0.1:8000` and the dashboard at `http://localhost:5173`. Existing databases upgrade on the next database connection; restart the backend to load the new code. `OPENROUTER_API_KEY` in `.env` is required for real agent runs; `MODEL_NAME` is optional. Vite proxies `/api` to the backend, overridable with `UNDERCOVER_API_URL`.
 
-Install with `uv sync` and `npm install` at the repository root. The project uses Python 3.12 and Node as specified in `docs/TECH_STACK.md`. Put `OPENROUTER_API_KEY` in `.env`; optionally set `MODEL_NAME`.
+`npm run check` runs Python formatting/lint/type checks and pytest, TypeScript formatting/lint/type checks and Vitest, and Playwright. Current coverage is 89 Python tests (99.30%), 47 dashboard tests (96.12% statements) and 21 browser tests. Thresholds remain at 80%; tests use stub models or prepared records without paid model calls.
 
-`npm run dev` starts the backend at `http://127.0.0.1:8000` and the dashboard at `http://localhost:5173`. Vite proxies `/api` to the backend; `UNDERCOVER_API_URL` can override its proxy target. Real agent runs require the backend to remain available while the agent calls its tools.
-
-## Verification
-
-`npm run check` runs Python formatting/lint/type checks and pytest, TypeScript formatting/lint/type checks and Vitest, and Playwright browser tests. Tests use stub models or prepared records and make no paid model calls.
-
-The completion checks cover 58 Python tests (99.67% coverage), 31 dashboard tests (96.38% statement coverage), and 11 browser tests. Coverage thresholds remain at 80%. Browser checks cover sign-off/payment, read-only instructions, all six claim outcomes, keyboard focus, and the three pages at 1440px and 390px in light and dark mode.
-
-`npm run e2e` starts dedicated servers on ports 18000 and 15173, refuses to reuse running servers, and uses a fresh temporary database that is removed on normal shutdown. It cannot reuse the development backend. Browser review screenshots are generated under ignored `e2e/test-results/`; Playwright Chromium screenshots were inspected directly because a Playwright MCP server was unavailable. Two consecutive fresh browser runs passed before the visual review; the expanded suite also passed after layout fixes.
+Playwright refuses existing servers and uses dedicated ports 18000/15173 and a fresh temporary database. It cannot reuse the development backend. Browser journeys cover human approval/denial, over-limit approvals with and without authority, sign-off/payment, direct clear outcomes, and consistent queue/detail labels. Screenshots of queue, referral, review and sign-off controls were inspected at 1440px and 390px in light and dark mode, including errors and keyboard focus. Direct Playwright Chromium screenshots substituted for the unavailable Playwright MCP server; images are under ignored `e2e/test-results/`.
 
 ## Known limitations
 
-- A model or network failure during a run can leave a claim `in_progress`; the queue only offers Run agent on waiting claims. There is no automatic retry or recovery action. A regression test documents this behavior. A run that returns without deciding can likewise leave the claim in progress.
-- A failed initial claim load stops polling; reload the page to retry. Supporting-record errors are retried on the next active-claim poll or page reload.
-- There is no durable agent checkpointing or persisted thread conversation. The thread id is passed to the agent configuration, but does not provide recovery.
-- These checks verify application behavior, not decision accuracy against the held-out answer key. This completion work did not inspect `data/evals/` or make a new live-model run; the original pilot plan records an earlier live check.
-- The pilot has no sign-in, real payments or customer messages, and the agent does not use the claims manual. Later course builds are outside the current `docs/` scope. No AWS resources were created or deleted.
-
-## Outcome and human-review change progress
-
-Phase 1 is verified: legacy records migrate transactionally and idempotently to explicit statuses, adding referral/reviewer fields. Within-limit approvals remain in progress until payment; payment/sign-off end as approved, declines as declined, referrals as waiting for human review. Python checks pass: 60 tests, 99.71% coverage. The dashboard update and handler workflow are in progress.
-
-Phase 2 is verified: `refer_human` and `resolve_human_review` API operations preserve referral/reviewer records and enforce payout authority in write transactions. Competing reviews resolve once, and failed activity writes roll back the decision/payment. The legacy refer decision delegates to the same handoff logic. Python checks pass: 80 tests, 99.05% coverage.
-
-Phase 3 is verified: the ninth agent tool, `refer_human`, hands off missing evidence, conflicting accounts or unclear policy applicability. Instructions distinguish clear exclusions from uncertainty and require stopping after handoff. Handler resolution is not an agent tool. Stub-model checks pass: 86 Python tests, 99.07% coverage.
-
-Phase 4 is verified: six explicit chips, a handler review form, preserved referral reasons and reviewer labels, pending-review/sign-off polling, and a top single-claim Run agent selector are implemented. Form validation, API errors, double-submission prevention and external handler resolution are covered. TypeScript checks pass: 47 tests, 96.12% statement coverage.
+- There is no sign-in. Handler selection records attribution, not authenticated identity; the human-review endpoint is not an authenticated human-only boundary.
+- Failed or incomplete agent runs can remain in progress, including an approval whose payment failed. There is no automatic retry/recovery action or durable agent checkpoint. The thread id alone does not persist a conversation.
+- An initial claim load failure requires a page reload; supporting-request failures retry on the next pending-state poll or reload. A handler decision rejected because another handler acted will refresh on polling.
+- Automated checks validate workflow behavior, not accuracy against the held-out answer key. This change did not inspect that answer key or make new live-model calls.
+- Payments are simulated; there are no customer messages or claims-manual access. Later course briefs remain outside the current build.
