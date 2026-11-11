@@ -3,6 +3,8 @@
 import json
 import sqlite3
 
+SCHEMA_VERSION = 2
+
 REVIEW_COLUMNS = (
     "referral_reason",
     "referral_reference",
@@ -30,7 +32,8 @@ def migrate(connection: sqlite3.Connection) -> None:
     """Apply the outcome/review upgrade exactly once, under a database write lock."""
     with connection:
         connection.execute("BEGIN IMMEDIATE")
-        if connection.execute("PRAGMA user_version").fetchone()[0] >= 1:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version >= SCHEMA_VERSION:
             return
         columns = {
             row["name"] for row in connection.execute("PRAGMA table_info(claims)")
@@ -56,4 +59,10 @@ def migrate(connection: sqlite3.Connection) -> None:
                     " referred_on = decided_on, decided_on = NULL WHERE claim_id = ?",
                     (row["claim_id"],),
                 )
-        connection.execute("PRAGMA user_version = 1")
+        if "run_started_on" not in columns:
+            connection.execute("ALTER TABLE claims ADD COLUMN run_started_on TEXT")
+        if "run_attempts" not in columns:
+            connection.execute(
+                "ALTER TABLE claims ADD COLUMN run_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        connection.execute("PRAGMA user_version = 2")

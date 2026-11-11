@@ -346,6 +346,12 @@ function ClaimDetail({ claimId }: { readonly claimId: string }) {
             <div className="facts">
               <Fact label="Type" value={claimType(claim.claim_type)} />
               <Fact label="Claimed" value={money(claim.amount_claimed)} />
+              {claim.run_attempts > 0 && (
+                <Fact
+                  label="Agent attempt"
+                  value={`${String(claim.run_attempts)} of 3`}
+                />
+              )}
               <Fact label="Submitted" value={claim.submitted_on} />
               <Fact
                 label="Incident"

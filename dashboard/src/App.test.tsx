@@ -61,6 +61,8 @@ function stubFetch(claims: ClaimRow[]) {
             reviewed_by: null,
             reviewed_on: null,
             decided_on: null,
+            run_started_on: null,
+            run_attempts: 0,
             signed_off_by: null,
             signed_off_on: null,
             paid_amount: null,

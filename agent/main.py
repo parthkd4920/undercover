@@ -2,10 +2,12 @@
 
 import json
 import os
+from time import monotonic
 
 import httpx
 from dotenv import load_dotenv
 from langchain.agents import create_agent
+from langchain.agents.middleware import before_model
 from langchain_core.language_models import BaseChatModel
 from langchain_core.tools import BaseTool, tool
 from langchain_openai import ChatOpenAI
@@ -28,6 +30,8 @@ def model() -> ChatOpenAI:
     name = os.getenv("MODEL_NAME")
     return ChatOpenAI(
         model=name or DEFAULT_MODEL,
+        timeout=30,
+        max_retries=0,
         base_url=OPENROUTER_BASE_URL,
         api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]),
         reasoning_effort=None if name else "low",
@@ -186,9 +190,18 @@ def action_tools_for(claim_id: str) -> list[BaseTool]:
 
 def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
     """Run the agent on one claim and return its final reply."""
+    deadline = monotonic() + 90
+
+    @before_model
+    def check_deadline(state, runtime) -> None:
+        """Stop between model turns after the attempt budget is exhausted."""
+        if monotonic() >= deadline:
+            raise TimeoutError("The agent attempt exceeded its 90-second budget")
+
     agent = create_agent(
         llm or model(),
         tools=tools_for(claim_id),
+        middleware=[check_deadline],
         system_prompt=instructions(),
     )
     result = agent.invoke(

@@ -121,6 +121,8 @@ function claim(status: ClaimStatus): Claim {
     referred_on: null,
     reviewed_by: null,
     reviewed_on: null,
+    run_started_on: null,
+    run_attempts: 0,
     decided_on: decided ? "2026-06-25T09:00:00Z" : null,
     signed_off_by: null,
     signed_off_on: null,
@@ -453,3 +455,37 @@ it.each(["waiting_for_human_review", "waiting_for_sign_off"] as const)(
     expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
   },
 );
+
+it("shows retry attempts and observes escalation to human review", async () => {
+  vi.useFakeTimers();
+  const records = {
+    "CLM-1001": {
+      ...claim("in_progress"),
+      run_attempts: 2,
+      run_started_on: "2026-11-12T12:00:00Z",
+    },
+  };
+  stubBackend(records);
+  render(<ClaimPage claimId="CLM-1001" />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(screen.getByText("2 of 3")).toBeDefined();
+  records["CLM-1001"] = {
+    ...records["CLM-1001"],
+    status: "waiting_for_human_review",
+    run_attempts: 3,
+    decision: "refer",
+    referral_reason:
+      "The agent did not complete this claim after three attempts.",
+  };
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(screen.getByText("3 of 3")).toBeDefined();
+  expect(screen.getByText("Waiting for human review")).toBeDefined();
+  expect(
+    screen.getByText(/did not complete this claim after three attempts/),
+  ).toBeDefined();
+  expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+});

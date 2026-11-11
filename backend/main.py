@@ -1,20 +1,16 @@
 """The UnderCover backend."""
 
+import asyncio
 import json
-import logging
 import sqlite3
-from contextlib import asynccontextmanager, closing
+from contextlib import asynccontextmanager, closing, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
-from agent import main as agent
-from backend import database, lifecycle, seed
+from backend import database, lifecycle, recovery, seed
 from backend.lifecycle import claim_or_error, now
-from backend.run_errors import describe_error, saved_work
 from backend.schemas import Decision, HumanReview, Payment, Referral, SignOff, Step
-
-logger = logging.getLogger(__name__)
 
 INSTRUCTIONS = Path(__file__).resolve().parent / "instructions.md"
 
@@ -24,7 +20,13 @@ async def lifespan(_: FastAPI):
     """Seed the database when it is empty."""
     with closing(database.connect()) as connection:
         seed.seed(connection)
-    yield
+    monitor = asyncio.create_task(recovery.watch())
+    try:
+        yield
+    finally:
+        monitor.cancel()
+        with suppress(asyncio.CancelledError):
+            await monitor
 
 
 app = FastAPI(title="UnderCover", lifespan=lifespan)
@@ -50,7 +52,8 @@ def list_claims() -> list[dict]:
     with closing(database.connect()) as connection:
         rows = connection.execute(
             "SELECT c.claim_id, c.claim_type, c.summary, c.amount_claimed,"
-            " c.status, c.decision, c.payout, c.submitted_on, cu.name AS customer_name"
+            " c.status, c.decision, c.payout, c.submitted_on, c.run_started_on,"
+            " c.run_attempts, cu.name AS customer_name"
             " FROM claims c JOIN customers cu ON cu.customer_id = c.customer_id"
             " ORDER BY c.submitted_on, c.claim_id"
         ).fetchall()
@@ -154,27 +157,13 @@ def get_agent_instructions() -> dict[str, str]:
 @app.post("/api/claims/{claim_id}/run", operation_id="run_agent")
 def run_agent(claim_id: str) -> dict[str, str]:
     """Set a claim in progress and run the UnderCover Agent on it."""
-    with closing(database.connect()) as connection:
-        row = claim_or_error(connection, claim_id)
-        if row["status"] != "waiting":
-            raise HTTPException(409, f"Claim {claim_id} is not waiting in the queue")
-        cursor = connection.execute(
-            "UPDATE claims SET status = 'in_progress'"
-            " WHERE claim_id = ? AND status = 'waiting'",
-            (claim_id,),
-        )
-        if cursor.rowcount != 1:
-            raise HTTPException(409, f"Claim {claim_id} is no longer waiting")
-        connection.commit()
-    try:
-        reply = agent.run(claim_id, claim_id)
-    except Exception as error:
-        logger.exception("Agent run failed for %s", claim_id)
-        with closing(database.connect()) as connection:
-            recorded = saved_work(claim_or_error(connection, claim_id))
-        detail = f"{describe_error(error)} {recorded} See backend logs for {claim_id}."
-        raise HTTPException(502, detail) from error
-    return {"reply": reply}
+    return {"reply": recovery.start(claim_id)}
+
+
+@app.post("/api/claims/{claim_id}/rerun", operation_id="rerun_agent")
+def rerun_agent(claim_id: str) -> dict[str, str]:
+    """Retry a stale undecided attempt or escalate after three attempts."""
+    return {"reply": recovery.rerun(claim_id)}
 
 
 @app.post("/api/claims/{claim_id}/steps", operation_id="add_step")

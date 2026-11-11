@@ -90,7 +90,7 @@ def test_startup_migrates_legacy_records_idempotently(tmp_path, monkeypatch):
             for key, value in old.items():
                 if key not in {"status", "decided_on"}:
                     assert updated[key] == value
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
         assert connection.execute("SELECT COUNT(*) FROM policies").fetchone()[0] == 50
 
 
@@ -113,3 +113,28 @@ def test_bad_legacy_claim_rolls_back_upgrade(tmp_path, monkeypatch):
             ).fetchone()[0]
             == "decided"
         )
+
+
+def test_v1_upgrade_adds_retry_fields_without_restarting_existing_claims(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "v1.db"
+    with closing(sqlite3.connect(path)) as connection:
+        connection.executescript(database.SCHEMA)
+        seed.seed(connection)
+        for column in REVIEW_COLUMNS:
+            connection.execute(f"ALTER TABLE claims ADD COLUMN {column} TEXT")
+        connection.execute(
+            "UPDATE claims SET status='in_progress' WHERE claim_id='CLM-1005'"
+        )
+        connection.execute("PRAGMA user_version = 1")
+        connection.commit()
+    monkeypatch.setenv("UNDERCOVER_DB", str(path))
+    with closing(database.connect()) as connection:
+        row = connection.execute(
+            "SELECT * FROM claims WHERE claim_id='CLM-1005'"
+        ).fetchone()
+        assert row["status"] == "in_progress"
+        assert row["run_started_on"] is None
+        assert row["run_attempts"] == 0
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2

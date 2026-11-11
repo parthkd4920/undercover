@@ -51,6 +51,8 @@ export interface Claim {
   reason: string | null;
   reference: string | null;
   decided_on: string | null;
+  run_started_on: string | null;
+  run_attempts: number;
   referral_reason: string | null;
   referral_reference: string | null;
   referred_on: string | null;

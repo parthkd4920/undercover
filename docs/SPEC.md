@@ -30,6 +30,7 @@ Our goal is to handle claims straight through, as accurately as our handlers do.
 ## Rules
 
 - A payout over $1,000 needs a handler's sign-off. The agent can approve such a claim, but the payment waits until a handler signs off. The system must block the payment until then, even if the agent tries to pay.
+- An undecided run still in progress after two minutes is retried automatically, without overlapping active agent work. There are three attempts total; a third stale attempt is referred to a human. Saved decisions and payments are not overwritten by retries.
 - Decisions follow the policy wording.
 - Our handlers' own decisions on these claims are in `data/evals/`. We use them to check the agent's work. The agent must never see them.
 - Amounts are in US dollars.

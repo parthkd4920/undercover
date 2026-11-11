@@ -266,3 +266,22 @@ def test_backend_timeout_is_returned_with_saved_work_caution(monkeypatch):
     assert "ReadTimeout" in result
     assert "request may already have saved work" in result
     assert "private transport details" not in result
+
+
+def test_model_requests_have_bounded_time_and_no_hidden_retries(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    configured = main.model()
+    assert configured.request_timeout == 30
+    assert configured.max_retries == 0
+
+
+def test_attempt_deadline_stops_before_another_model_call(monkeypatch):
+    ticks = iter([0, 91])
+    monkeypatch.setattr(main, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(main, "backend", lambda: TestClient(app))
+    with pytest.raises(TimeoutError, match="90-second budget"):
+        main.run(
+            "CLM-1001",
+            "CLM-1001",
+            StubModel(messages=iter([AIMessage(content="No decision")])),
+        )
