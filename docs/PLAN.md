@@ -252,11 +252,11 @@ Legacy mapping: `decided` + paid approval → `approved`; `decided` + unpaid app
 
 Add the request schemas, shared lifecycle helpers and two operations in `backend/main.py`. Preserve the original referral explanation independently of the handler's final reason. Keep both writes and payments transactional.
 
-- [ ] API tests: refer a running claim → `waiting_for_human_review`, referral explanation/date and activity step saved, no payment; equivalent legacy `decide_claim(... refer ...)` produces the same result.
-- [ ] API tests: a handler's $420 approval resolves the referral as `approved` and paid; denial resolves it as `declined` with payout zero and no payment. Both record reviewer, final reason/reference and decision date while retaining referral details.
-- [ ] API tests: an authorized handler's $2,000 approval records sign-off and pays; an unauthorized handler's $2,000 approval waits for sign-off, and smaller payment attempts still cannot bypass that requirement.
-- [ ] Tests reject unknown claims/handlers, wrong-state actions, repeated or competing resolutions, nonzero denial/referral payouts, blank explanations and negative/non-finite amounts without partial updates or duplicate activity/payment records.
-- [ ] OpenAPI lists both new operation ids and required inputs; `npm run check:python` passes with coverage at least 80%.
+- [x] API tests: refer a running claim → `waiting_for_human_review`, referral explanation/date and activity step saved, no payment; equivalent legacy `decide_claim(... refer ...)` produces the same result.
+- [x] API tests: a handler's $420 approval resolves the referral as `approved` and paid; denial resolves it as `declined` with payout zero and no payment. Both record reviewer, final reason/reference and decision date while retaining referral details.
+- [x] API tests: an authorized handler's $2,000 approval records sign-off and pays; an unauthorized handler's $2,000 approval waits for sign-off, and smaller payment attempts still cannot bypass that requirement.
+- [x] Tests reject unknown claims/handlers, wrong-state actions, repeated or competing resolutions, nonzero denial/referral payouts, blank explanations and negative/non-finite amounts without partial updates or duplicate activity/payment records.
+- [x] OpenAPI lists both new operation ids and required inputs; `npm run check:python` passes with coverage at least 80%.
 
 ### Phase 3: teach the agent to hand off uncertain cases
 

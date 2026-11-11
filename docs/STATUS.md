@@ -45,3 +45,5 @@ The completion checks cover 58 Python tests (99.67% coverage), 31 dashboard test
 ## Outcome and human-review change progress
 
 Phase 1 is verified: legacy records migrate transactionally and idempotently to explicit statuses, adding referral/reviewer fields. Within-limit approvals remain in progress until payment; payment/sign-off end as approved, declines as declined, referrals as waiting for human review. Python checks pass: 60 tests, 99.71% coverage. The dashboard update and handler workflow are in progress.
+
+Phase 2 is verified: `refer_human` and `resolve_human_review` API operations preserve referral/reviewer records and enforce payout authority in write transactions. Competing reviews resolve once, and failed activity writes roll back the decision/payment. The legacy refer decision delegates to the same handoff logic. Python checks pass: 80 tests, 99.05% coverage.

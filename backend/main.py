@@ -3,14 +3,14 @@
 import json
 import sqlite3
 from contextlib import asynccontextmanager, closing
-from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 
 from agent import main as agent
-from backend import database, seed
-from backend.schemas import Decision, Payment, SignOff, Step
+from backend import database, lifecycle, seed
+from backend.lifecycle import claim_or_error, now
+from backend.schemas import Decision, HumanReview, Payment, Referral, SignOff, Step
 
 INSTRUCTIONS = Path(__file__).resolve().parent / "instructions.md"
 
@@ -26,35 +26,12 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="UnderCover", lifespan=lifespan)
 
 
-def claim_or_error(connection: sqlite3.Connection, claim_id: str) -> sqlite3.Row:
-    """Return the claim, or raise the backend's not-found error."""
-    row = connection.execute(
-        "SELECT * FROM claims WHERE claim_id = ?", (claim_id,)
-    ).fetchone()
-    if row is None:
-        raise HTTPException(404, f"Claim {claim_id} not found")
-    return row
-
-
 def claim_json(row: sqlite3.Row) -> dict:
     """Return a claim row as a dictionary, with its items and documents parsed."""
     claim = dict(row)
     claim["items"] = json.loads(claim["items"])
     claim["documents"] = json.loads(claim["documents"])
     return claim
-
-
-def now() -> str:
-    """Return the current UTC time as an ISO string."""
-    return datetime.now(UTC).isoformat()
-
-
-def payout_limit(connection: sqlite3.Connection) -> float:
-    """Return the payout amount over which a handler's sign-off is needed."""
-    settings = json.loads(
-        connection.execute("SELECT settings FROM company").fetchone()[0]
-    )
-    return settings["payout_approval_limit"]
 
 
 @app.get("/api/health", operation_id="health")
@@ -201,89 +178,45 @@ def add_step(claim_id: str, step: Step) -> dict[str, str]:
 
 @app.post("/api/claims/{claim_id}/decide", operation_id="decide_claim")
 def decide_claim(claim_id: str, decision: Decision) -> dict:
-    """Record the decision on a claim and set where it stands."""
+    """Record an agent decision or a pending human referral."""
     with closing(database.connect()) as connection:
-        row = claim_or_error(connection, claim_id)
-        if row["decision"] is not None:
-            raise HTTPException(409, f"Claim {claim_id} is already decided")
-        if row["status"] != "in_progress":
-            raise HTTPException(409, f"Claim {claim_id} is not in progress")
-        status = {
-            "approve": "in_progress",
-            "decline": "declined",
-            "refer": "waiting_for_human_review",
-        }[decision.decision]
-        if decision.decision == "approve" and decision.payout > payout_limit(
-            connection
-        ):
-            status = "waiting_for_sign_off"
-        connection.execute(
-            "UPDATE claims SET decision = ?, payout = ?, reason = ?, reference = ?,"
-            " decided_on = ?, status = ? WHERE claim_id = ?",
-            (
-                decision.decision,
-                decision.payout,
-                decision.reason,
-                decision.reference,
-                now(),
-                status,
-                claim_id,
-            ),
-        )
+        lifecycle.decide(connection, claim_id, decision)
         connection.commit()
         return claim_json(claim_or_error(connection, claim_id))
 
 
 @app.post("/api/claims/{claim_id}/pay", operation_id="pay_claim")
 def pay_claim(claim_id: str, payment: Payment) -> dict:
-    """Pay an approved claim, blocked over the approval limit without sign-off."""
+    """Pay an approval, enforcing sign-off based on the approved payout."""
     with closing(database.connect()) as connection:
-        row = claim_or_error(connection, claim_id)
-        if row["decision"] != "approve":
-            raise HTTPException(409, f"Claim {claim_id} has not been approved")
-        if row["paid_on"] is not None:
-            raise HTTPException(409, f"Claim {claim_id} has already been paid")
-        if payment.amount > row["payout"]:
-            raise HTTPException(
-                409, f"Claim {claim_id} was approved for ${row['payout']:,.2f}"
-            )
-        limit = payout_limit(connection)
-        if row["payout"] > limit and row["signed_off_by"] is None:
-            raise HTTPException(
-                403,
-                f"The payout on claim {claim_id} is over the ${limit:,.2f}"
-                " approval limit and needs a handler's sign-off",
-            )
-        connection.execute(
-            "UPDATE claims SET paid_amount = ?, paid_on = ?, status = 'approved'"
-            " WHERE claim_id = ?",
-            (payment.amount, now(), claim_id),
-        )
+        connection.execute("BEGIN IMMEDIATE")
+        lifecycle.pay(connection, claim_id, payment.amount)
         connection.commit()
         return claim_json(claim_or_error(connection, claim_id))
 
 
 @app.post("/api/claims/{claim_id}/sign-off", operation_id="sign_off_claim")
 def sign_off_claim(claim_id: str, sign_off: SignOff) -> dict:
-    """Sign off an over-limit approval, pay it and decide the claim."""
+    """Sign off and pay an over-limit approval."""
     with closing(database.connect()) as connection:
-        row = claim_or_error(connection, claim_id)
-        if row["status"] != "waiting_for_sign_off":
-            raise HTTPException(409, f"Claim {claim_id} is not waiting for sign-off")
-        handler = connection.execute(
-            "SELECT * FROM handlers WHERE handler_id = ?", (sign_off.handler_id,)
-        ).fetchone()
-        if handler is None:
-            raise HTTPException(404, f"Handler {sign_off.handler_id} not found")
-        if not handler["can_approve_over_limit"]:
-            raise HTTPException(
-                403, f"{handler['name']} cannot approve payouts over the limit"
-            )
-        at = now()
-        connection.execute(
-            "UPDATE claims SET signed_off_by = ?, signed_off_on = ?, paid_amount = ?,"
-            " paid_on = ?, status = 'approved' WHERE claim_id = ?",
-            (sign_off.handler_id, at, row["payout"], at, claim_id),
-        )
+        lifecycle.sign_off(connection, claim_id, sign_off.handler_id)
+        connection.commit()
+        return claim_json(claim_or_error(connection, claim_id))
+
+
+@app.post("/api/claims/{claim_id}/refer", operation_id="refer_human")
+def refer_human(claim_id: str, referral: Referral) -> dict:
+    """Refer a running claim to a human with an explanation."""
+    with closing(database.connect()) as connection:
+        lifecycle.refer(connection, claim_id, referral)
+        connection.commit()
+        return claim_json(claim_or_error(connection, claim_id))
+
+
+@app.post("/api/claims/{claim_id}/human-review", operation_id="resolve_human_review")
+def resolve_human_review(claim_id: str, review: HumanReview) -> dict:
+    """Record a handler decision and pay it when authorized."""
+    with closing(database.connect()) as connection:
+        lifecycle.resolve(connection, claim_id, review)
         connection.commit()
         return claim_json(claim_or_error(connection, claim_id))
