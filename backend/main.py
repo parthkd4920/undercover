@@ -206,6 +206,8 @@ def decide_claim(claim_id: str, decision: Decision) -> dict:
         row = claim_or_error(connection, claim_id)
         if row["decision"] is not None:
             raise HTTPException(409, f"Claim {claim_id} is already decided")
+        if row["status"] != "in_progress":
+            raise HTTPException(409, f"Claim {claim_id} is not in progress")
         status = "decided"
         if decision.decision == "approve" and decision.payout > payout_limit(
             connection
@@ -242,7 +244,7 @@ def pay_claim(claim_id: str, payment: Payment) -> dict:
                 409, f"Claim {claim_id} was approved for ${row['payout']:,.2f}"
             )
         limit = payout_limit(connection)
-        if payment.amount > limit and row["signed_off_by"] is None:
+        if row["payout"] > limit and row["signed_off_by"] is None:
             raise HTTPException(
                 403,
                 f"The payout on claim {claim_id} is over the ${limit:,.2f}"

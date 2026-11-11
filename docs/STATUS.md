@@ -24,3 +24,7 @@ A claim moves `waiting` → `in_progress` → `decided`, or `waiting_for_sign_of
 ## Pending
 
 - Phase 6 of the plan: the claim detail page (story, items, documents, steps, decision, sign-off) and the agent instructions page
+
+## Pilot completion progress
+
+Completion phase 1 is verified: decisions require an in-progress claim, sign-off is based on the approved payout even for a smaller payment request, and money inputs must be finite and nonnegative. Python checks pass: 57 tests, 99.67% coverage. The existing Phase 6 dashboard changes are being completed and reviewed.

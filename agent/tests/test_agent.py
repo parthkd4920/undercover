@@ -1,11 +1,25 @@
 """Tests for the UnderCover Agent."""
 
+from contextlib import closing
+
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage
 
 from agent import main
+from backend import database
 from backend.main import app
+
+
+@pytest.fixture(autouse=True)
+def start_claim(fresh_database):
+    """Arrange the running claim without invoking a paid model."""
+    with closing(database.connect()) as connection:
+        connection.execute(
+            "UPDATE claims SET status = 'in_progress' WHERE claim_id = 'CLM-1001'"
+        )
+        connection.commit()
 
 
 class StubModel(GenericFakeChatModel):

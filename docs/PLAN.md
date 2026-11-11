@@ -128,3 +128,62 @@ The claim page: story, items and documents, the customer and policy, the agent's
 - [ ] An e2e test runs the pages in dark mode
 - [ ] `npm run check` passes in full: ruff, pyright, pytest, prettier, eslint, tsc, vitest and Playwright
 - [ ] `docs/STATUS.md` describes the whole build, how to run it and any known gaps
+
+## Next steps after the current-code review (November 11, 2026)
+
+This is a completion plan for the pilot, preserving the original phases above. No later build brief is present in `docs/`, so the next work stays within the pilot. Implementation requires the student's review of this plan first.
+
+### Review baseline
+
+`docs/STATUS.md` says Phase 6 is pending, but the working tree already contains the claim detail and instructions pages, their unit tests, and sign-off and dark-mode end-to-end tests. Review and finish these changes rather than rebuild them. Existing edits also include notebooks and `docs/CODE_STANDARDS.md`; preserve those and keep unrelated edits out of product commits.
+
+`npm run check` passed during this review: 45 Python tests (99.67% coverage), 19 dashboard tests (93.96% statement coverage), and 5 Playwright tests. ESLint reported one warning for a conditional in `e2e/claim.spec.ts`. Passing checks do not yet cover the gaps below. Playwright can reuse running servers, so this result alone does not establish isolation from the local development database. No model calls or answer-key inspection were needed.
+
+### Completion phase 1: enforce the claim lifecycle and sign-off rule
+
+The backend currently allows a decision on a waiting claim, despite the original design requiring `in_progress`. It also checks the requested payment amount against the sign-off limit: an approval for $2,000 can be paid $1,000 without sign-off and become `decided`. Base the sign-off requirement on the approved payout so smaller payment requests cannot bypass it. Reject negative and non-finite money inputs, keeping payment separate from the decision.
+
+- [x] Add regression tests showing a waiting claim cannot be decided, an in-progress claim can be decided, and a decided claim cannot be decided again.
+- [x] Add a regression test: approve $2,000, request payment of $1,000 without sign-off, receive an error, and retain `waiting_for_sign_off` with no payment recorded.
+- [x] Verify the boundary: a $1,000 approval can be paid without sign-off; an approval above $1,000 requires sign-off; authorized sign-off pays the approved payout exactly once.
+- [x] Money validation rejects negative and non-finite values without changing the claim. Keep zero-payout declines and referrals valid.
+- [x] Update lifecycle and stub-agent test setup to enter `in_progress` without calling a real model; `npm run check:python` passes with coverage at least 80%.
+
+### Completion phase 2: finish the claim page's decision and loading behavior
+
+`DecisionPanel` currently labels every unpaid decision as waiting for sign-off, including declines and referrals. Show payment and sign-off information according to the decision and status. The page also silently converts failed customer/policy loads into permanent loading placeholders and failed step loads into an empty history. Show useful errors for these required sections. Clear previous claim state on navigation and ignore responses for a claim that is no longer selected.
+
+- [ ] Tests cover approve, decline and refer: only an approval waiting for sign-off displays the sign-off message and controls; an unpaid approval within the limit has an accurate payment label.
+- [ ] Tests cover sign-off failure, disabled submission while signing, and exclusion of handlers without approval authority.
+- [ ] Tests show customer, policy, steps and handler load failures visibly, without suggesting that missing results are still loading or that the history is empty.
+- [ ] A delayed-response test navigates between claim ids and verifies that the earlier response cannot overwrite the selected claim.
+- [ ] Timer-based tests verify that steps refresh during `in_progress`, the completed decision appears, and polling stops when the claim finishes or the page unmounts. Repeated step descriptions render without duplicate React keys.
+- [ ] Add the brief function comments required by `docs/CODE_STANDARDS.md` to the new page functions; `npm run check:ts` passes with coverage at least 80%.
+
+### Completion phase 3: make end-to-end verification repeatable
+
+The sign-off test currently chooses any waiting claim and changes it, while Playwright is configured to reuse an existing backend. Give the suite a dedicated database and servers, and arrange known claim states without a live model. Update the sign-off setup to respect the lifecycle rule from completion phase 1.
+
+- [ ] Automated tests cannot reuse the ordinary development backend or change its database; use dedicated test ports and an isolated test database with deterministic setup.
+- [ ] Replace the conditional early return in `e2e/claim.spec.ts` with deterministic setup and assertions; ESLint reports no warnings for this test.
+- [ ] The sign-off journey verifies an over-limit approval, eligible handler selection, payment, recorded signer, and removal of sign-off controls.
+- [ ] Add a browser test for read-only agent instructions and assert story, item and document content on the claim page.
+- [ ] `npm run e2e` passes on two consecutive runs without manual database cleanup or paid model calls.
+
+### Completion phase 4: inspect the pages in the browser
+
+Automated assertions cover behavior, but the original Phase 6 browser review remains outstanding. Use the Playwright MCP server when available; otherwise record the browser-tool substitution used for visual review.
+
+- [ ] Inspect queue, claim detail and instructions in light and dark mode, including a narrow viewport; content, tables and sign-off controls remain readable and usable.
+- [ ] Check keyboard navigation and visible focus for links, handler selection and sign-off.
+- [ ] Inspect waiting, in-progress, waiting-for-sign-off, approved-and-paid, declined and referred claims using test fixtures; the visible labels match each state.
+- [ ] Record the outcome and resolve any layout or usability defects before marking the original Phase 6 browser criterion complete.
+
+### Completion phase 5: reconcile documentation and hand over the pilot
+
+Update the documentation to describe the verified product and any remaining limitations. Keep future harness, database migration and deployment work out of this pilot completion.
+
+- [ ] `docs/STATUS.md` describes all three dashboard routes, the backend and agent architecture, payment/sign-off enforcement, run commands and known limitations. Assess and document the current behavior where a failed agent run can leave a claim `in_progress`; do not claim retry or recovery exists.
+- [ ] Tick the original Phase 6 criteria only when their corresponding checks and browser review are complete.
+- [ ] Run `npm run check` after the final product changes; all checks pass without lowering thresholds or disabling rules.
+- [ ] Commit each completed implementation phase with the pre-commit hook enabled, staging only its intended files and preserving unrelated student work. Do not push.

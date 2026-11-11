@@ -2,6 +2,7 @@
 
 from contextlib import closing
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend import database
@@ -18,6 +19,13 @@ REFERENCE = "Policy wording, section 3"
 
 def decide(claim_id: str, decision: str, payout: float):
     """Decide a claim through the API."""
+    with closing(database.connect()) as connection:
+        connection.execute(
+            "UPDATE claims SET status = 'in_progress'"
+            " WHERE claim_id = ? AND status = 'waiting'",
+            (claim_id,),
+        )
+        connection.commit()
     return client.post(
         f"/api/claims/{claim_id}/decide",
         json={
@@ -213,3 +221,52 @@ def test_steps_are_listed_in_order():
     ]
     assert steps[0]["at"] <= steps[1]["at"]
     assert add_step("CLM-9999", "nope").status_code == 404
+
+
+def test_waiting_claim_cannot_be_decided():
+    response = client.post(
+        "/api/claims/CLM-1001/decide",
+        json={
+            "decision": "approve",
+            "payout": 420,
+            "reason": REASON,
+            "reference": REFERENCE,
+        },
+    )
+    assert response.status_code == 409
+    assert client.get("/api/claims/CLM-1001").json()["decision"] is None
+
+
+def test_smaller_payment_cannot_bypass_sign_off():
+    decide("CLM-1001", "approve", 2000)
+    assert pay("CLM-1001", 1000).status_code == 403
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "waiting_for_sign_off"
+    assert claim["paid_on"] is None
+
+
+@pytest.mark.parametrize("payout", [1000, 1000.01])
+def test_sign_off_boundary(payout):
+    decide("CLM-1001", "approve", payout)
+    response = pay("CLM-1001", payout)
+    assert response.status_code == (200 if payout == 1000 else 403)
+
+
+@pytest.mark.parametrize("amount", [-1, "NaN", "Infinity", "-Infinity"])
+@pytest.mark.parametrize("operation", ["decide", "pay"])
+def test_invalid_money_cannot_change_a_claim(amount, operation):
+    decide("CLM-1001", "approve", 420)
+    before = client.get("/api/claims/CLM-1001").json()
+    body = (
+        {"amount": amount}
+        if operation == "pay"
+        else {
+            "decision": "approve",
+            "payout": amount,
+            "reason": REASON,
+            "reference": REFERENCE,
+        }
+    )
+    response = client.post(f"/api/claims/CLM-1001/{operation}", json=body)
+    assert response.status_code == 422
+    assert client.get("/api/claims/CLM-1001").json() == before

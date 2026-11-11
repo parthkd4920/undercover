@@ -2,14 +2,14 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Decision(BaseModel):
     """A decision on a claim."""
 
     decision: Literal["approve", "decline", "refer"]
-    payout: float
+    payout: float = Field(ge=0, allow_inf_nan=False)
     reason: str
     reference: str
 
@@ -17,7 +17,7 @@ class Decision(BaseModel):
 class Payment(BaseModel):
     """A payment on a claim."""
 
-    amount: float
+    amount: float = Field(ge=0, allow_inf_nan=False)
 
 
 class SignOff(BaseModel):
