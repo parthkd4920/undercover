@@ -113,10 +113,10 @@ Rewrite `agent/main.py`: fetch the instructions from `get_agent_instructions` an
 
 The queue page with the brand: layout, fonts and colors from `docs/BRAND.md`, light and dark modes, status chips in the four state colors, money in JetBrains Mono as `$1,250.00`, and a Run agent button on waiting claims that calls `run_agent` and refreshes the queue while the agent works. Hash routes for queue, claim and instructions pages. A typed API client in `src/lib/api.ts`.
 
-- [ ] `npm run check:ts` passes with vitest coverage at 80% statements or more, testing the queue with a stubbed `fetch`: 25 claims, statuses, amounts, the run button on waiting claims and its absence on decided claims
-- [ ] With `npm run dev`, the Playwright MCP server sees the queue at `http://localhost:5173` with 25 claims, each with a status chip, in both light and dark mode
-- [ ] An e2e test covers the queue: claims listed with their statuses, and a claim detail route opens
-- [ ] The existing health e2e test still passes
+- [x] `npm run check:ts` passes with vitest coverage at 80% statements or more, testing the queue with a stubbed `fetch`: 25 claims, statuses, amounts, the run button on waiting claims and its absence on decided claims
+- [x] With `npm run dev`, the Playwright MCP server sees the queue at `http://localhost:5173` with 25 claims, each with a status chip, in both light and dark mode
+- [x] An e2e test covers the queue: claims listed with their statuses, and a claim detail route opens
+- [x] The existing health e2e test still passes
 
 ## Phase 6: the claim detail and instructions pages, and the end-to-end run
 

@@ -1,6 +1,6 @@
 # Status
 
-The pilot build, from `docs/PLAN.md`. Phase 1 of 6 is done: the backend has its SQLite database, seeded from `data/`.
+The pilot build, from `docs/PLAN.md`. Phases 1 to 5 of 6 are done: the backend, the agent, and the dashboard's queue page.
 
 ## What's built
 
@@ -15,10 +15,12 @@ The pilot build, from `docs/PLAN.md`. Phase 1 of 6 is done: the backend has its 
 
 A claim moves `waiting` → `in_progress` → `decided`, or `waiting_for_sign_off` → `decided` when a handler signs off. The $1,000 rule is enforced by the backend, not the agent's instructions.
 
+- `dashboard/`: the claims team's dashboard. Hash routes: `#/` the queue, `#/claims/{id}` a claim (placeholder until Phase 6), `#/agent` the instructions (placeholder until Phase 6). The queue table shows every claim with its customer, type, date, amount claimed, payout and a status chip, in the brand's colors and fonts, in light and dark mode. It polls the backend every 2 seconds, so the queue follows the agent as it works. A Run agent button on waiting claims calls `run_agent`; queue-load and agent-run errors show in a banner. `src/lib/api.ts` is the typed API client; `src/hooks/useHashRoute.ts` follows the page's hash.
+
 ## How to run it
 
 `npm run dev` starts the backend and the dashboard. `npm run check` runs every check.
 
 ## Pending
 
-- Phases 5 and 6 of the plan: the dashboard
+- Phase 6 of the plan: the claim detail page (story, items, documents, steps, decision, sign-off) and the agent instructions page

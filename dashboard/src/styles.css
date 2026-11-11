@@ -1,0 +1,253 @@
+:root {
+  --sea-green: #06d6a0;
+  --marigold: #ffc145;
+  --coral: #f78c6b;
+  --cerulean: #118ab2;
+  --raspberry: #ef476f;
+  --midnight: #073b4c;
+  --sea-mist: #cdd8db;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --page: #f0f4f5;
+    --panel: #ffffff;
+    --ink: var(--midnight);
+    --ink-soft: #4e6a77;
+    --accent: #049c79;
+    --gold-ink: #8a6b0f;
+    --coral-ink: #b3532c;
+    --rule: rgb(7 59 76 / 0.08);
+    --shadow: rgb(7 59 76 / 0.08);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #04232e;
+    --panel: #000000;
+    --ink: var(--sea-mist);
+    --ink-soft: #8ca4ae;
+    --accent: #3fe3b7;
+    --gold-ink: #ffd47e;
+    --coral-ink: #ffb39c;
+    --rule: rgb(205 216 219 / 0.12);
+    --shadow: rgb(0 0 0 / 0.5);
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 28px 48px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0 20px;
+}
+
+.wordmark {
+  margin: 0;
+  font-size: 28px;
+}
+
+.tagline {
+  margin: 0;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--accent);
+}
+
+.topbar nav {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.topbar nav a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.topbar nav a.active,
+.topbar nav a:hover {
+  color: var(--accent);
+}
+
+.backend {
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding-left: 18px;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 22px 26px;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.panel + .panel {
+  margin-top: 18px;
+}
+
+.panel h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+}
+
+.panel .sub {
+  margin: 0 0 16px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.queue {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.queue th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding: 8px 10px;
+}
+
+.queue td {
+  padding: 12px 10px;
+  vertical-align: top;
+}
+
+.queue tbody tr + tr {
+  border-top: 1px solid var(--rule);
+}
+
+.queue tbody tr:hover {
+  background: var(--rule);
+}
+
+.queue a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.queue a:hover {
+  color: var(--accent);
+}
+
+.queue .summary {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.right {
+  text-align: right;
+}
+
+.chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chip-decided {
+  background: var(--sea-green);
+  color: var(--midnight);
+}
+
+.chip-in_progress {
+  background: var(--marigold);
+  color: var(--midnight);
+}
+
+.chip-waiting_for_sign_off {
+  background: var(--coral);
+  color: var(--midnight);
+}
+
+.chip-waiting {
+  background: var(--cerulean);
+  color: #fff;
+}
+
+button {
+  font: inherit;
+  font-weight: 700;
+  color: var(--midnight);
+  background: var(--sea-green);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 18px;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.96);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+button.quiet {
+  background: none;
+  color: var(--accent);
+  padding: 7px 10px;
+}
+
+.error {
+  background: var(--raspberry);
+  color: #fff;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.empty {
+  color: var(--ink-soft);
+  padding: 24px 0;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  button {
+    color: var(--midnight);
+  }
+}
