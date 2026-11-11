@@ -262,10 +262,10 @@ Add the request schemas, shared lifecycle helpers and two operations in `backend
 
 Add the API-only `refer_human` tool in `agent/main.py` and clarify `backend/instructions.md`. Keep clear approvals and exclusions automatic; hand off genuine uncertainty with an actionable explanation. Once referred, end the run with a concise handoff message and do not pay or attempt the handler endpoint.
 
-- [ ] Stub-model tests cover missing required evidence, conflicting evidence and ambiguous policy applicability: the referral tool is exposed, reaches the backend, records a step, and leaves the claim waiting for human review without payment.
-- [ ] Stub tests verify a clear approval is paid and becomes `approved`, an over-limit approval waits for sign-off, and a clear exclusion becomes `declined` without referral.
-- [ ] A test inspects the tool list and confirms `resolve_human_review` is not exposed to the agent; referral failures return useful backend error text to the model.
-- [ ] Instructions explain how to separate clear lack of coverage from unresolved policy applicability, and prohibit inventing evidence or policy references. Automated tests make no real model calls; `npm run check:python` passes.
+- [x] Stub-model tests cover missing required evidence, conflicting evidence and ambiguous policy applicability: the referral tool is exposed, reaches the backend, records a step, and leaves the claim waiting for human review without payment.
+- [x] Stub tests verify a clear approval is paid and becomes `approved`, an over-limit approval waits for sign-off, and a clear exclusion becomes `declined` without referral.
+- [x] A test inspects the tool list and confirms `resolve_human_review` is not exposed to the agent; referral failures return useful backend error text to the model.
+- [x] Instructions explain how to separate clear lack of coverage from unresolved policy applicability, and prohibit inventing evidence or policy references. Automated tests make no real model calls; `npm run check:python` passes.
 
 ### Phase 4: show outcomes and give handlers a review form
 

@@ -156,7 +156,19 @@ def action_tools_for(claim_id: str) -> list[BaseTool]:
             record(f"Paid {money(amount)} on {claim_id}")
         return result
 
-    return [decide_claim, pay_claim]
+    @tool
+    def refer_human(reason: str, reference: str) -> str:
+        """Refer this claim when evidence or policy applicability is unclear.
+        Explain what needs review and the policy section, or why it is unclear.
+        After a successful referral, stop working this claim and do not pay it."""
+        result = call(
+            "POST", f"/api/claims/{claim_id}/refer", reason=reason, reference=reference
+        )
+        if result.startswith("Error"):
+            record(f"Could not refer {claim_id} to a human")
+        return result
+
+    return [decide_claim, pay_claim, refer_human]
 
 
 def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:

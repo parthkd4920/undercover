@@ -152,3 +152,83 @@ def test_model_name(monkeypatch):
     assert main.model().model_name == "openai/gpt-6-luna"
     monkeypatch.setenv("MODEL_NAME", "openrouter/free")
     assert main.model().model_name == "openrouter/free"
+
+
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "The required receipt is missing; a handler needs to assess the evidence.",
+        "The story conflicts with the notice; a handler must resolve the dates.",
+        "Policy applicability is ambiguous; a handler must determine coverage.",
+    ],
+)
+def test_uncertain_cases_are_referred_without_payment(reason, monkeypatch):
+    client = work_a_claim(
+        [
+            tool_call(
+                "refer_human",
+                {
+                    "reason": reason,
+                    "reference": "Applicability unclear; review section 3",
+                },
+                "1",
+            ),
+            AIMessage(content="Referred to a human for review."),
+        ],
+        TestClient(app),
+        monkeypatch,
+    )
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "waiting_for_human_review"
+    assert claim["referral_reason"] == reason
+    assert claim["paid_on"] is None
+    assert (
+        client.get("/api/claims/CLM-1001/steps")
+        .json()[0]["step"]
+        .startswith("Referred to a human")
+    )
+
+
+def test_clear_exclusion_is_declined(monkeypatch):
+    client = work_a_claim(
+        [
+            tool_call(
+                "decide_claim",
+                {
+                    "claim_id": "CLM-1001",
+                    "decision": "decline",
+                    "payout": 0,
+                    "reason": "The incident is outside the insured trip dates.",
+                    "reference": "Section 9",
+                },
+                "1",
+            ),
+            AIMessage(content="The claim was declined under section 9."),
+        ],
+        TestClient(app),
+        monkeypatch,
+    )
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "declined"
+    assert claim["referred_on"] is None
+    assert claim["paid_on"] is None
+
+
+def test_human_resolution_is_not_an_agent_tool():
+    names = {tool.name for tool in main.tools_for("CLM-1001")}
+    assert "refer_human" in names
+    assert "resolve_human_review" not in names
+
+
+def test_referral_error_is_returned_to_the_model(monkeypatch):
+    client = TestClient(app)
+    monkeypatch.setattr(main, "backend", lambda: client)
+    referral = next(
+        tool for tool in main.tools_for("CLM-1001") if tool.name == "refer_human"
+    )
+    body = {"reason": "Missing evidence", "reference": "Section 3"}
+    referral.invoke(body)
+    result = referral.invoke(body)
+    assert result.startswith("Error:")
+    assert "not in progress" in result
+    assert client.get("/api/claims/CLM-1001").json()["paid_on"] is None
