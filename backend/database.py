@@ -4,6 +4,8 @@ import os
 import sqlite3
 from pathlib import Path
 
+from backend.migrations import migrate
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS claims (
     claim_id TEXT PRIMARY KEY,
@@ -99,4 +101,9 @@ def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(db_path())
     connection.row_factory = sqlite3.Row
     connection.executescript(SCHEMA)
+    try:
+        migrate(connection)
+    except Exception:
+        connection.close()
+        raise
     return connection

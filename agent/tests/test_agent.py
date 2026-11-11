@@ -77,7 +77,7 @@ def test_run_reads_the_records_then_decides_and_pays(monkeypatch):
         monkeypatch,
     )
     claim = client.get("/api/claims/CLM-1001").json()
-    assert claim["status"] == "decided"
+    assert claim["status"] == "approved"
     assert claim["decision"] == "approve"
     assert claim["payout"] == 420.0
     assert claim["paid_amount"] == 420.0

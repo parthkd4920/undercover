@@ -208,7 +208,11 @@ def decide_claim(claim_id: str, decision: Decision) -> dict:
             raise HTTPException(409, f"Claim {claim_id} is already decided")
         if row["status"] != "in_progress":
             raise HTTPException(409, f"Claim {claim_id} is not in progress")
-        status = "decided"
+        status = {
+            "approve": "in_progress",
+            "decline": "declined",
+            "refer": "waiting_for_human_review",
+        }[decision.decision]
         if decision.decision == "approve" and decision.payout > payout_limit(
             connection
         ):
@@ -251,7 +255,7 @@ def pay_claim(claim_id: str, payment: Payment) -> dict:
                 " approval limit and needs a handler's sign-off",
             )
         connection.execute(
-            "UPDATE claims SET paid_amount = ?, paid_on = ?, status = 'decided'"
+            "UPDATE claims SET paid_amount = ?, paid_on = ?, status = 'approved'"
             " WHERE claim_id = ?",
             (payment.amount, now(), claim_id),
         )
@@ -278,7 +282,7 @@ def sign_off_claim(claim_id: str, sign_off: SignOff) -> dict:
         at = now()
         connection.execute(
             "UPDATE claims SET signed_off_by = ?, signed_off_on = ?, paid_amount = ?,"
-            " paid_on = ?, status = 'decided' WHERE claim_id = ?",
+            " paid_on = ?, status = 'approved' WHERE claim_id = ?",
             (sign_off.handler_id, at, row["payout"], at, claim_id),
         )
         connection.commit()

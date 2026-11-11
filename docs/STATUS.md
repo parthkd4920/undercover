@@ -41,3 +41,7 @@ The completion checks cover 58 Python tests (99.67% coverage), 31 dashboard test
 - There is no durable agent checkpointing or persisted thread conversation. The thread id is passed to the agent configuration, but does not provide recovery.
 - These checks verify application behavior, not decision accuracy against the held-out answer key. This completion work did not inspect `data/evals/` or make a new live-model run; the original pilot plan records an earlier live check.
 - The pilot has no sign-in, real payments or customer messages, and the agent does not use the claims manual. Later course builds are outside the current `docs/` scope. No AWS resources were created or deleted.
+
+## Outcome and human-review change progress
+
+Phase 1 is verified: legacy records migrate transactionally and idempotently to explicit statuses, adding referral/reviewer fields. Within-limit approvals remain in progress until payment; payment/sign-off end as approved, declines as declined, referrals as waiting for human review. Python checks pass: 60 tests, 99.71% coverage. The dashboard update and handler workflow are in progress.

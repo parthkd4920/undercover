@@ -13,9 +13,10 @@ A claim moves through the four states the team needs to see:
 - `waiting` — in the queue, nobody working it
 - `in_progress` — the agent is working it
 - `waiting_for_sign_off` — the agent approved a payout over $1,000; payment is blocked until a handler signs off
-- `decided` — the agent has decided (approve within the limit and paid, decline, or refer)
-
-Transitions: `waiting` → `run_agent` → `in_progress` → `decide_claim` → `decided` (approve up to the limit, decline or refer) or `waiting_for_sign_off` (approve over the limit) → handler signs off, which pays the approved payout → `decided`.
+- `waiting_for_human_review` — the agent is facing difficulty to confidently approve or deny a claim or the case is outside the scope of the policies so agent refers to a human to approve or deny.
+- `approved` — the agent has decided and approved within the limit and paid.
+- `declined` - the agent has read the claim and after reviewing it against the policy declined it.
+Transitions: `waiting` → `run_agent` → `in_progress` → `decide_claim` → `approved` or `declined` (approve up to the limit, decline or refer) or `waiting_for_sign_off` (approve over the limit) → handler signs off, which pays the approved payout → `decided` or `waiting_for_human_review` → refers to a human agent and waits for decision → `approved` or `declined`.
 
 ### Backend
 
@@ -35,6 +36,7 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 | `decide_claim` | Record decision (approve, decline, refer), payout, reason and policy reference; sets the status |
 | `pay_claim` | Pay an approved claim; takes the amount; blocked over $1,000 without sign-off |
 | `sign_off_claim` | A handler signs off an over-limit approval; the payout is then paid and the claim is decided |
+| `refer_human` | agent refers to a Human handler to approve or deny which then would result in immediate approval or refusal by the Handler |
 | `add_step` | Record one step of the agent's work on a claim |
 | `get_policy` | One policy: plan, add-ons, purchase date, trip, travelers |
 | `get_customer` | One customer: contact details and claim history |
@@ -61,8 +63,8 @@ The dashboard triggers the agent through `run_agent` on the backend, which calls
 
 React with Vite and TypeScript, hash routes, no router dependency. Brand per `docs/BRAND.md`: Instrument Sans for headings and body, Instrument Serif for the tagline, JetBrains Mono for ids, numbers and money; panels rounded with no outline; light and dark modes via `prefers-color-scheme`. The four claim states use Sea Green (`decided`), Marigold (`in_progress`), Coral (`waiting_for_sign_off`) and Cerulean (`waiting`), with Midnight text on the first three and white on Cerulean.
 
-- `#/` the queue: every claim with its status, amount and a Run agent button on waiting claims; refreshed while the agent works
-- `#/claims/{id}` the claim in full: story, items, documents, the customer and policy, the agent's steps as they happen (polled while the claim is in progress), the decision with payout, reason and policy reference, payment, and a sign-off with a handler choice on claims waiting for sign-off
+- `#/` the queue: every claim with its status, amount and a Run agent button on the top; refreshed while the agent works.
+- `#/claims/{id}` the claim in full: story, items, documents, the customer and policy, the agent's steps as they happen (polled while the claim is in progress), the decision with payout, reason and policy reference, payment, and a sign-off with a handler choice on claims waiting for sign-off and approve or deny buttons on the claims referred to human to decide.
 - `#/agent` the agent's instructions, read only
 
 ### Testing
@@ -90,12 +92,13 @@ Operations `list_claims`, `get_claim`, `list_steps`, `get_policy`, `get_customer
 
 ## Phase 3: the claim lifecycle
 
-Operations `add_step`, `decide_claim`, `pay_claim` and `sign_off_claim`, with the money rules enforced in the backend. Status transitions: `decide_claim` sets `decided` for a decline, a refer or an approval within the limit, and `waiting_for_sign_off` for an approval over the limit. `pay_claim` pays an approved claim within its payout, blocked over the approval limit unless signed off. `sign_off_claim` records the handler, pays the approved payout and sets `decided`.
+Operations `add_step`, `decide_claim`, `pay_claim`,`refer_human`, and `sign_off_claim`, with the money rules enforced in the backend. Status transitions: `decide_claim` sets `declined`, `waiting_for_human_review` or an `approved` within the limit, and `waiting_for_sign_off` for an approval over the limit. `pay_claim` pays an approved claim within its payout, blocked over the approval limit unless signed off. `sign_off_claim` records the handler, pays the approved payout and sets `approved`. `waiting_for_human_review` records the handler and pays the payout if handler approves then sets `approved` or if handler denies sets `declined` and in which case no payout is done.
 
-- [x] Tests: deciding CLM-1001 as approve with payout 420 records decision, reason, reference and `decided_on`, and the status becomes `decided`
+- [x] Tests: deciding CLM-1001 as approve with payout 420 records decision, reason, reference and `decided_on`, and the status becomes `approved`
 - [x] Tests: deciding with payout 2000 sets `waiting_for_sign_off`, and `pay_claim` of 2000 returns an error whose `detail` says the payout needs a handler's sign-off
-- [x] Tests: after `sign_off_claim` with a handler who `can_approve_over_limit`, the claim is `decided` with `paid_amount` 2000, `signed_off_by` and `paid_on` set
+- [x] Tests: after `sign_off_claim` with a handler who `can_approve_over_limit`, the claim is `approved` with `paid_amount` 2000, `signed_off_by` and `paid_on` set
 - [x] Tests: `pay_claim` refuses a claim that is not approved, an amount over the approved payout, a claim already paid, and a handler without `can_approve_over_limit` signing off; `decide_claim` refuses a claim that is already decided, so a test can arrange a claim without calling a model
+- [ ] Tests: setting `waiting_for_human_review` initiates having approve or deny buttons and upon approve the status is `approved` and payout is done and deny sets the status as `declined` and no payout is done.
 - [x] Tests: `add_step` then `list_steps` returns the steps in order
 - [x] `npm run check:python` passes with coverage at 80% or more
 
@@ -192,3 +195,101 @@ Update the documentation to describe the verified product and any remaining limi
 - [x] Commit each completed implementation phase with the pre-commit hook enabled, staging only its intended files and preserving unrelated student work. Do not push.
 
 Final verification: `npm run check` passed with 58 Python tests (99.67% coverage), 31 dashboard tests (96.38% statement coverage), and 11 Playwright tests. Format, lint and type checks passed without lint warnings. Each completion phase was committed with hooks enabled; unrelated notebook and code-standard edits were preserved, and nothing was pushed. The failed-run limitation is documented and covered by a regression test.
+
+## Change plan: explicit outcomes and human review
+
+This section plans the student's revised requirements. It supersedes conflicting status and referral behavior in the earlier design; earlier checked boxes record the previous pilot build, not completion of these changes. All criteria below remain pending. No product code has been changed for this plan.
+
+### What the code does today
+
+The backend uses `decided` for approved, declined and referred claims. The agent already knows to refer ambiguous claims through `decide_claim(decision="refer")`, but that records a terminal decision. There is no referral endpoint, handler decision endpoint, reviewer audit record or review form. The dashboard's types, chips, fixtures and browser tests all assume the old statuses. Existing SQLite databases retain their records across startup, so changing the seed alone would leave old claims incompatible with the new dashboard.
+
+### Proposed behavior and terminology
+
+Use the six status values in the revised design: `waiting`, `in_progress`, `waiting_for_sign_off`, `waiting_for_human_review`, `approved`, `declined`. Use Approved and Declined as outcome labels, with Approve and Deny as the human action buttons. Keep `approve` and `decline` as decision values to avoid unnecessary changes to tools and historical records. There is no new `denied` status alias.
+
+The revised definition of `approved` includes payment. Keep approval and payment as separate operations, as required by the tech stack: an agent's within-limit approval records `decision="approve"` while status remains `in_progress`; successful payment changes status to `approved`. Until then the detail page says Approval recorded, payment pending. This avoids presenting a claim as paid before payment succeeds and lets existing active-claim polling observe the payment. An over-limit approval enters `waiting_for_sign_off`; authorized sign-off pays it and changes status to `approved`. If a run fails between approval and payment, retain the recorded decision and show payment pending; this change does not introduce automatic recovery.
+
+| Current state | Action | Result |
+|---|---|---|
+| `waiting` | Run agent | `in_progress` |
+| `in_progress` | Agent approves $1,000 or less | Approval recorded; remains `in_progress` until payment |
+| `in_progress` with recorded approval | Pay approved amount | `approved`, payment recorded |
+| `in_progress` | Agent approves above $1,000 | `waiting_for_sign_off`, unpaid |
+| `in_progress` | Agent denies under clear policy terms | `declined`, unpaid |
+| `in_progress` | Agent cannot confidently settle the claim | `waiting_for_human_review`, unpaid |
+| `waiting_for_human_review` | Handler denies with reasons | `declined`, reviewer recorded, unpaid |
+| `waiting_for_human_review` | Handler approves $1,000 or less | `approved`, reviewer and payment recorded together |
+| `waiting_for_human_review` | Handler with over-limit authority approves above $1,000 | `approved`, reviewer, sign-off and payment recorded together |
+| `waiting_for_human_review` | Handler without over-limit authority approves above $1,000 | `waiting_for_sign_off`, reviewer recorded, unpaid |
+| `waiting_for_sign_off` | Eligible handler signs off | `approved`, sign-off and payment recorded |
+
+Human review and payout sign-off are separate responsibilities. Any existing handler may review coverage; only handlers with `can_approve_over_limit` may authorize payment above $1,000. The backend enforces that distinction regardless of dashboard controls. A referral waits for a real handler action; the agent does not simulate or automatically complete that action. As with the current pilot, selecting a handler records attribution but is not authenticated identity.
+
+Refer when essential documents are missing, evidence conflicts, wording is ambiguous or the case cannot be confidently resolved from the supplied policy. Clear exclusions or clearly uncovered losses can still be declined with the relevant policy reference. Explain what is uncertain and what the handler needs to resolve; do not invent a policy section or force approval because the agent is uncertain. No numeric confidence score, claims-manual access, new model or later-course harness is needed.
+
+### API and record changes
+
+- Add `POST /api/claims/{claim_id}/refer`, operation id `refer_human`, with required `reason` and `reference`. It accepts only an undecided `in_progress` claim, records the referral and an activity step, sets `decision="refer"`, and moves to `waiting_for_human_review` without paying. For a missing applicable section, `reference` may explicitly say that applicability is unclear. Require nonblank explanatory text.
+- Preserve existing `decide_claim(decision="refer", payout=0, ...)` calls by routing them through the same referral logic; reject a nonzero referral payout. The agent's new normal route is the explicit `refer_human` tool. Approval/decline validation still prevents overwriting a recorded decision; a referral can only be resolved through the handler operation.
+- Add `POST /api/claims/{claim_id}/human-review`, operation id `resolve_human_review`, with required `handler_id`, `decision` (`approve` or `decline`), `payout`, `reason` and `reference`. This operation is used by the dashboard and is not an agent tool. It accepts only `waiting_for_human_review`, validates the handler, and applies the transition table above. A denial requires payout zero; approvals require finite nonnegative amounts. Nonzero denial payouts are also rejected by the ordinary decision endpoint.
+- Add nullable `referral_reason`, `referral_reference`, `referred_on`, `reviewed_by`, and `reviewed_on` fields to claims. Preserve the referral explanation after a human decision replaces the current `decision`, `reason`, `reference`, `payout` and `decided_on`. A pending referral has no final decision timestamp. Read APIs return the new fields; the queue already returns the status and needs no new route.
+- Reuse backend payment/sign-off validation inside the human-resolution transaction. Keep payment as a distinct operation for the agent. Human resolution can orchestrate decision and payment together, as existing sign-off already does. Do not make loopback HTTP calls from one backend operation to another.
+- Require the expected status in conditional updates and check affected rows so competing/repeated review submissions cannot overwrite a decision or pay twice. Commit decision, reviewer, payment/sign-off and activity step together. Failed validation changes none of them.
+
+### Phase 1: introduce the status contract and migrate stored claims
+
+Update `backend/database.py`, startup initialization and lifecycle status assignments, with migration tests. Make fresh and existing databases agree before adding review actions. Use a small versioned or idempotent SQLite migration, not a database reset.
+
+Legacy mapping: `decided` + paid approval → `approved`; `decided` + unpaid approval within limit → `in_progress` with the recorded decision retained; an unpaid over-limit approval without sign-off → `waiting_for_sign_off`; `decided` + decline → `declined`; `decided` + refer → `waiting_for_human_review`. Copy legacy referral reason/reference/date into the new referral fields before clearing its final-decision timestamp. Preserve existing waiting, running and sign-off claims. Do not infer a missing reviewer or signer. Report an inconsistent legacy row that cannot be mapped rather than deleting it or inventing an outcome.
+
+- [x] Tests construct an old-schema temporary database containing paid approvals, unpaid approvals, declines, referrals and waiting/sign-off claims; startup adds fields and maps every supported case as specified.
+- [x] Running migration twice changes nothing on the second run; all claim ids, amounts, documents, payment/sign-off records, activity steps and seed counts are preserved.
+- [x] New decisions/payments/sign-offs return the new statuses; no live API response uses `decided`. A within-limit recorded approval stays in progress until payment succeeds.
+- [x] Existing money, duplicate-decision, duplicate-payment and $1,000-boundary regression tests pass with updated expectations; `npm run check:python` passes at 80% coverage or more.
+
+### Phase 2: implement referral and handler resolution
+
+Add the request schemas, shared lifecycle helpers and two operations in `backend/main.py`. Preserve the original referral explanation independently of the handler's final reason. Keep both writes and payments transactional.
+
+- [ ] API tests: refer a running claim → `waiting_for_human_review`, referral explanation/date and activity step saved, no payment; equivalent legacy `decide_claim(... refer ...)` produces the same result.
+- [ ] API tests: a handler's $420 approval resolves the referral as `approved` and paid; denial resolves it as `declined` with payout zero and no payment. Both record reviewer, final reason/reference and decision date while retaining referral details.
+- [ ] API tests: an authorized handler's $2,000 approval records sign-off and pays; an unauthorized handler's $2,000 approval waits for sign-off, and smaller payment attempts still cannot bypass that requirement.
+- [ ] Tests reject unknown claims/handlers, wrong-state actions, repeated or competing resolutions, nonzero denial/referral payouts, blank explanations and negative/non-finite amounts without partial updates or duplicate activity/payment records.
+- [ ] OpenAPI lists both new operation ids and required inputs; `npm run check:python` passes with coverage at least 80%.
+
+### Phase 3: teach the agent to hand off uncertain cases
+
+Add the API-only `refer_human` tool in `agent/main.py` and clarify `backend/instructions.md`. Keep clear approvals and exclusions automatic; hand off genuine uncertainty with an actionable explanation. Once referred, end the run with a concise handoff message and do not pay or attempt the handler endpoint.
+
+- [ ] Stub-model tests cover missing required evidence, conflicting evidence and ambiguous policy applicability: the referral tool is exposed, reaches the backend, records a step, and leaves the claim waiting for human review without payment.
+- [ ] Stub tests verify a clear approval is paid and becomes `approved`, an over-limit approval waits for sign-off, and a clear exclusion becomes `declined` without referral.
+- [ ] A test inspects the tool list and confirms `resolve_human_review` is not exposed to the agent; referral failures return useful backend error text to the model.
+- [ ] Instructions explain how to separate clear lack of coverage from unresolved policy applicability, and prohibit inventing evidence or policy references. Automated tests make no real model calls; `npm run check:python` passes.
+
+### Phase 4: show outcomes and give handlers a review form
+
+Update `dashboard/src/lib/api.ts`, status labels/chips and CSS, queue fixtures, and the claim detail page. Use Approved (Sea Green), Declined (Raspberry), Waiting for human review (Coral), Waiting for sign-off (Coral), In progress (Marigold), and Waiting (Cerulean), always with text labels. Show the referral reason separately from the final human decision.
+
+On a referred claim show a Handler selector, payout input in USD, reason and policy-reference fields, and Approve/Deny buttons. The form supplies zero payout for Deny. Show an explanatory message when an approval above $1,000 will need another handler's sign-off. Disable both actions during submission, show API validation errors, and refresh the claim after success. Only referred claims show review controls; existing sign-off controls remain for sign-off claims. Poll both waiting-for-review and waiting-for-sign-off claims so another handler's action appears and closes stale controls; stop at final outcomes and cancel on navigation.
+
+The revised queue paragraph also moves Run agent to the top. Proposed scope is one selected waiting claim: add a claim selector and top Run agent button using the existing single-claim endpoint, disabled when nothing is eligible or a run is pending. Do not infer a dispatcher or batch execution from button placement. This detail is pending the student's preference; the outcome/referral work is independent of that answer.
+
+- [ ] Vitest covers all six status labels/chips with no Decided label, paid approvals, recorded approvals awaiting payment, and readable pending referrals.
+- [ ] Form tests cover approval, denial, missing inputs, invalid amounts, handler selection, API failure, disabled double submission and the over-limit sign-off path; the original referral reason remains visible after resolution.
+- [ ] Tests verify review and sign-off polling observes another handler's resolution and stops afterward; navigation ignores stale responses and failed review requests leave controls recoverable.
+- [ ] Queue tests cover the agreed top-button behavior, waiting-only eligibility and existing run errors without adding batch processing unless explicitly selected.
+- [ ] `npm run check:ts` passes with strict types and at least 80% statement coverage; old fixtures and App tests use the new status contract.
+
+### Phase 5: verify journeys and reconcile documentation
+
+Extend the isolated Playwright fixtures and browser suite. Reconcile the active design at the top of this document, the changed acceptance criteria and `docs/STATUS.md`. Update the status paragraph in `docs/SPEC.md` to reflect the student's approved requirement, retaining the original policy/payment rules. Keep previous build verification clearly historical; checked boxes are not evidence for an unimplemented requirement.
+
+- [ ] Browser journeys: referral → handler approval → approved and paid; referral → handler denial → declined and unpaid; over-limit human approval without authority → sign-off → approved and paid; direct agent approval/decline continue working using stubbed/prepared records.
+- [ ] Browser assertions verify queue and detail show the same outcome, reviewer and payment amounts are correct, referral reasons survive, and stale review controls disappear after resolution. Tests do not mutate the development database or call a model.
+- [ ] Inspect updated queue chips and review/sign-off forms in light/dark mode at desktop and phone widths; check keyboard navigation, visible focus, error messages and long referral explanations using Playwright MCP if available, or record the browser substitution used.
+- [ ] `npm run check` passes in full without lowering thresholds or disabling rules. Repeat the isolated browser suite to confirm clean setup.
+- [ ] Update `docs/STATUS.md` with migration behavior, endpoints, six statuses, human-review/sign-off distinctions, tests and remaining limitations. In particular, there is still no sign-in, authenticated reviewer identity, durable graph or automatic failed-run recovery.
+- [ ] Implement and commit each phase with hooks enabled, preserving unrelated student edits; never push. Check off this section only after its new criteria are verified.
+
+Planning handoff: review this change plan before implementation. No database has been migrated, no claim has been changed, and no later course build is included.

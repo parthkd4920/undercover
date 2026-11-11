@@ -58,7 +58,7 @@ def test_deciding_an_approval_within_the_limit_decides_the_claim():
     response = decide("CLM-1001", "approve", 420.0)
     assert response.status_code == 200
     claim = response.json()
-    assert claim["status"] == "decided"
+    assert claim["status"] == "in_progress"
     assert claim["decision"] == "approve"
     assert claim["payout"] == 420.0
     assert claim["reason"] == REASON
@@ -68,8 +68,10 @@ def test_deciding_an_approval_within_the_limit_decides_the_claim():
 
 
 def test_deciding_a_decline_or_a_refer_decides_the_claim():
-    assert decide("CLM-1002", "decline", 0.0).json()["status"] == "decided"
-    assert decide("CLM-1003", "refer", 0.0).json()["status"] == "decided"
+    assert decide("CLM-1002", "decline", 0.0).json()["status"] == "declined"
+    assert (
+        decide("CLM-1003", "refer", 0.0).json()["status"] == "waiting_for_human_review"
+    )
 
 
 def test_deciding_an_approval_over_the_limit_waits_for_sign_off():
@@ -110,7 +112,7 @@ def test_paying_an_approval_within_the_limit():
     response = pay("CLM-1007", 420.0)
     assert response.status_code == 200
     claim = response.json()
-    assert claim["status"] == "decided"
+    assert claim["status"] == "approved"
     assert claim["paid_amount"] == 420.0
     assert claim["paid_on"] is not None
 
@@ -150,7 +152,7 @@ def test_signing_off_pays_an_over_limit_approval():
     response = sign_off("CLM-1012", "HND-02")
     assert response.status_code == 200
     claim = response.json()
-    assert claim["status"] == "decided"
+    assert claim["status"] == "approved"
     assert claim["signed_off_by"] == "HND-02"
     assert claim["signed_off_on"] is not None
     assert claim["paid_amount"] == 2500.0
