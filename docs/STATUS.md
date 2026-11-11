@@ -32,3 +32,5 @@ Completion phase 1 is verified: decisions require an in-progress claim, sign-off
 Completion phase 2 is verified: the claim and instructions pages are implemented; claim details report failed supporting requests, discard old navigation responses, poll active claims, and show decision-specific payment labels. TypeScript checks pass without warnings: 30 tests, 96.38% statement coverage.
 
 Completion phase 3 is verified: Playwright uses ports 18000/15173, refuses existing servers, seeds a disposable temporary database, and never calls a model. All six browser tests pass on two consecutive fresh runs, including instructions and the over-limit sign-off/payment journey.
+
+Completion phase 4 is verified: Playwright Chromium screenshots were inspected as the substitute for the unavailable Playwright MCP server. Queue, claim and instructions were reviewed in light/dark mode at 1440px and 390px, along with all six claim outcomes and mobile sign-off focus. Fixed table wrapping and overflow, responsive navigation and visible focus. All 11 browser tests pass.

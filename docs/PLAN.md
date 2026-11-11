@@ -122,10 +122,10 @@ The queue page with the brand: layout, fonts and colors from `docs/BRAND.md`, li
 
 The claim page: story, items and documents, the customer and policy, the agent's steps polled while the claim is in progress, the decision panel with payout, reason and policy reference, payment, and sign-off with a handler choice on claims waiting for it. The instructions page renders the agent's instructions read only. Finish `docs/STATUS.md`.
 
-- [ ] `npm run check:ts` passes with vitest coverage at 80% statements or more, covering the claim page with stubbed `fetch` (decision, steps, sign-off button when waiting for sign-off) and the instructions page
-- [ ] With `npm run dev`, the Playwright MCP server: open a claim, see the story, items and documents; open the agent instructions, read only
-- [ ] An e2e test decides a claim over $1,000 through the backend API, then signs off on the claim page and sees the claim decided and paid
-- [ ] An e2e test runs the pages in dark mode
+- [x] `npm run check:ts` passes with vitest coverage at 80% statements or more, covering the claim page with stubbed `fetch` (decision, steps, sign-off button when waiting for sign-off) and the instructions page
+- [x] With isolated backend/Vite test servers, Playwright Chromium (substituting for the unavailable MCP server): open a claim, see the story, items and documents; open the agent instructions, read only
+- [x] An e2e test decides a claim over $1,000 through the backend API, then signs off on the claim page and sees the claim decided and paid
+- [x] An e2e test runs the pages in dark mode
 - [ ] `npm run check` passes in full: ruff, pyright, pytest, prettier, eslint, tsc, vitest and Playwright
 - [ ] `docs/STATUS.md` describes the whole build, how to run it and any known gaps
 
@@ -174,10 +174,13 @@ The sign-off test currently chooses any waiting claim and changes it, while Play
 
 Automated assertions cover behavior, but the original Phase 6 browser review remains outstanding. Use the Playwright MCP server when available; otherwise record the browser-tool substitution used for visual review.
 
-- [ ] Inspect queue, claim detail and instructions in light and dark mode, including a narrow viewport; content, tables and sign-off controls remain readable and usable.
-- [ ] Check keyboard navigation and visible focus for links, handler selection and sign-off.
-- [ ] Inspect waiting, in-progress, waiting-for-sign-off, approved-and-paid, declined and referred claims using test fixtures; the visible labels match each state.
-- [ ] Record the outcome and resolve any layout or usability defects before marking the original Phase 6 browser criterion complete.
+- [x] Inspect queue, claim detail and instructions in light and dark mode, including a narrow viewport; content, tables and sign-off controls remain readable and usable.
+- [x] Check keyboard navigation and visible focus for links, handler selection and sign-off.
+- [x] Inspect waiting, in-progress, waiting-for-sign-off, approved-and-paid, declined and referred claims using test fixtures; the visible labels match each state.
+- [x] Record the outcome and resolve any layout or usability defects before marking the original Phase 6 browser criterion complete.
+
+
+Browser review evidence: Playwright Chromium generated screenshots in `e2e/test-results/`, inspected directly because a Playwright MCP server was unavailable. All three pages were reviewed at 1440px and 390px in light and dark mode; all six claim states and mobile sign-off were checked. Fixed wrapped money/headings, narrow table overflow, navigation/control wrapping, and keyboard focus. The expanded browser suite passes all 11 tests.
 
 ### Completion phase 5: reconcile documentation and hand over the pilot
 

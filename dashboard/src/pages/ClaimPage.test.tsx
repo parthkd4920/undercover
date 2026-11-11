@@ -6,7 +6,14 @@ import {
   screen,
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Claim, ClaimStatus, Customer, Handler, Policy } from "../lib/api";
+import type {
+  Claim,
+  ClaimStatus,
+  Customer,
+  Handler,
+  Policy,
+  Step,
+} from "../lib/api";
 import { ClaimPage } from "./ClaimPage";
 
 afterEach(() => {
@@ -119,8 +126,18 @@ function claim(status: ClaimStatus): Claim {
 
 interface StubOptions {
   failPath?: string;
+  steps?: () => Step[];
   signOff?: () => Promise<Response>;
   claimResponse?: (id: string) => Response | Promise<Response>;
+}
+
+/** Return the current activity fixture. */
+function stubSteps(options: StubOptions): Step[] {
+  return (
+    options.steps?.() ?? [
+      { step: "Read claim CLM-1001", at: "2026-06-25T09:00:00Z" },
+    ]
+  );
 }
 
 /** Stub the API while allowing delayed responses and individual failures. */
@@ -145,11 +162,7 @@ function stubBackend(
         return new Response(JSON.stringify(loaded));
       }
       if (input === "/api/claims/CLM-1001/steps") {
-        return new Response(
-          JSON.stringify([
-            { step: "Read claim CLM-1001", at: "2026-06-25T09:00:00Z" },
-          ]),
-        );
+        return new Response(JSON.stringify(stubSteps(options)));
       }
       if (
         input === "/api/claims/CLM-1001/sign-off" &&
@@ -334,18 +347,23 @@ it("ignores a delayed response after navigating to another claim", async () => {
 it("polls an active claim and stops when the decision arrives", async () => {
   vi.useFakeTimers();
   const records = { "CLM-1001": claim("in_progress") };
-  stubBackend(records);
+  let step = 0;
+  stubBackend(records, {
+    steps: () => [{ step: `Step ${String(++step)}`, at: "2026-11-11" }],
+  });
   const view = render(<ClaimPage claimId="CLM-1001" />);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(0);
   });
   expect(screen.getByText("In progress")).toBeDefined();
+  expect(screen.getByText("Step 1")).toBeDefined();
   const fetchMock = vi.mocked(fetch);
   const calls = fetchMock.mock.calls.length;
   await act(async () => {
     await vi.advanceTimersByTimeAsync(2000);
   });
   expect(fetchMock.mock.calls.length).toBeGreaterThan(calls);
+  expect(screen.getByText("Step 2")).toBeDefined();
   records["CLM-1001"] = claim("decided");
   await act(async () => {
     await vi.advanceTimersByTimeAsync(2000);
@@ -372,4 +390,21 @@ it("cancels polling on unmount", async () => {
     await vi.advanceTimersByTimeAsync(4000);
   });
   expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
+});
+
+it("renders repeated step descriptions as separate entries", async () => {
+  const error = vi.spyOn(console, "error");
+  stubBackend(
+    { "CLM-1001": claim("decided") },
+    {
+      steps: () => [
+        { step: "Read the policy wording", at: "2026-11-11T09:00:00Z" },
+        { step: "Read the policy wording", at: "2026-11-11T09:00:00Z" },
+      ],
+    },
+  );
+  render(<ClaimPage claimId="CLM-1001" />);
+  expect(await screen.findAllByText("Read the policy wording")).toHaveLength(2);
+  expect(error).not.toHaveBeenCalled();
+  error.mockRestore();
 });

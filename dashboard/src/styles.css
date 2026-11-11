@@ -435,3 +435,76 @@ button.quiet {
 .instructions p {
   margin: 10px 0;
 }
+
+/* Keep tables usable on narrow screens and make keyboard focus visible. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.queue {
+  min-width: 900px;
+}
+
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+.table-scroll:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.signoff,
+.topbar,
+.topbar nav {
+  flex-wrap: wrap;
+}
+
+.panel,
+.claim-side,
+.claim-grid > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px 12px 32px;
+  }
+
+  .panel {
+    padding: 18px 16px;
+  }
+
+  .topbar nav {
+    gap: 12px;
+  }
+
+  .backend {
+    padding-left: 0;
+  }
+
+  .signoff select {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.queue {
+  overflow-wrap: normal;
+}
+
+.queue th,
+.queue .mono,
+.queue button {
+  white-space: nowrap;
+}
+
+.items {
+  min-width: 480px;
+  overflow-wrap: normal;
+}
+
+.items th,
+.items .mono {
+  white-space: nowrap;
+}

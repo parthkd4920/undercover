@@ -59,29 +59,31 @@ function StoryPanel({ claim }: { readonly claim: Claim }) {
     <section className="panel">
       <h3>The claim</h3>
       <p className="story">{claim.story}</p>
-      <table className="items">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th>Category</th>
-            <th className="right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {claim.items.map((item) => (
-            <tr key={item.description}>
-              <td>{item.description}</td>
-              <td>{item.category}</td>
-              <td className="right mono">{money(item.amount)}</td>
+      <div className="table-scroll" role="region" aria-label="Claim items">
+        <table className="items">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th className="right">Amount</th>
             </tr>
-          ))}
-          <tr>
-            <td>Claimed in total</td>
-            <td></td>
-            <td className="right mono">{money(claim.amount_claimed)}</td>
-          </tr>
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {claim.items.map((item) => (
+              <tr key={item.description}>
+                <td>{item.description}</td>
+                <td>{item.category}</td>
+                <td className="right mono">{money(item.amount)}</td>
+              </tr>
+            ))}
+            <tr>
+              <td>Claimed in total</td>
+              <td></td>
+              <td className="right mono">{money(claim.amount_claimed)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <h4>Documents</h4>
       {claim.documents.map((document) => (
         <div key={document.name} className="document">
@@ -204,6 +206,9 @@ function StepsPanel({
           {error}
         </p>
       )}
+      {error === null && steps.length === 0 && (
+        <p className="sub">No steps recorded yet</p>
+      )}
       <ol className="steps">
         {steps.map((step, index) => (
           <li key={`${step.at}-${String(index)}`}>{step.step}</li>
@@ -238,7 +243,9 @@ function DecisionPanel(props: DecisionPanelProps) {
         <>
           <p>
             <strong>{decisionWord(claim.decision)}</strong>
-            {claim.payout !== null && ` ${money(claim.payout)}`}
+            {claim.decision === "approve" && claim.payout !== null && (
+              <span className="mono"> {money(claim.payout)}</span>
+            )}
           </p>
           <p>{claim.reason}</p>
           <p className="sub">Policy reference: {claim.reference}</p>

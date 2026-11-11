@@ -66,52 +66,54 @@ export function QueuePage() {
       {claims === null ? (
         <p className="empty">Loading the queue...</p>
       ) : (
-        <table className="queue">
-          <thead>
-            <tr>
-              <th>Claim</th>
-              <th>Customer</th>
-              <th>Type</th>
-              <th>Submitted</th>
-              <th className="right">Claimed</th>
-              <th className="right">Payout</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {claims.map((claim) => (
-              <tr key={claim.claim_id}>
-                <td>
-                  <a className="mono" href={`#/claims/${claim.claim_id}`}>
-                    {claim.claim_id}
-                  </a>
-                  <div className="summary">{claim.summary}</div>
-                </td>
-                <td>{claim.customer_name}</td>
-                <td>{claimType(claim.claim_type)}</td>
-                <td className="mono">{claim.submitted_on}</td>
-                <td className="right mono">{money(claim.amount_claimed)}</td>
-                <td className="right mono">
-                  {claim.payout === null ? "—" : money(claim.payout)}
-                </td>
-                <td>
-                  <StatusChip status={claim.status} />
-                </td>
-                <td className="right">
-                  {claim.status === "waiting" && (
-                    <button
-                      disabled={running === claim.claim_id}
-                      onClick={() => void run(claim.claim_id)}
-                    >
-                      {running === claim.claim_id ? "Running" : "Run agent"}
-                    </button>
-                  )}
-                </td>
+        <div className="table-scroll" role="region" aria-label="Claims table">
+          <table className="queue">
+            <thead>
+              <tr>
+                <th>Claim</th>
+                <th>Customer</th>
+                <th>Type</th>
+                <th>Submitted</th>
+                <th className="right">Claimed</th>
+                <th className="right">Payout</th>
+                <th>Status</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {claims.map((claim) => (
+                <tr key={claim.claim_id}>
+                  <td>
+                    <a className="mono" href={`#/claims/${claim.claim_id}`}>
+                      {claim.claim_id}
+                    </a>
+                    <div className="summary">{claim.summary}</div>
+                  </td>
+                  <td>{claim.customer_name}</td>
+                  <td>{claimType(claim.claim_type)}</td>
+                  <td className="mono">{claim.submitted_on}</td>
+                  <td className="right mono">{money(claim.amount_claimed)}</td>
+                  <td className="right mono">
+                    {claim.payout === null ? "—" : money(claim.payout)}
+                  </td>
+                  <td>
+                    <StatusChip status={claim.status} />
+                  </td>
+                  <td className="right">
+                    {claim.status === "waiting" && (
+                      <button
+                        disabled={running === claim.claim_id}
+                        onClick={() => void run(claim.claim_id)}
+                      >
+                        {running === claim.claim_id ? "Running" : "Run agent"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );
