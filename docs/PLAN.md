@@ -164,11 +164,11 @@ The backend currently allows a decision on a waiting claim, despite the original
 
 The sign-off test currently chooses any waiting claim and changes it, while Playwright is configured to reuse an existing backend. Give the suite a dedicated database and servers, and arrange known claim states without a live model. Update the sign-off setup to respect the lifecycle rule from completion phase 1.
 
-- [ ] Automated tests cannot reuse the ordinary development backend or change its database; use dedicated test ports and an isolated test database with deterministic setup.
-- [ ] Replace the conditional early return in `e2e/claim.spec.ts` with deterministic setup and assertions; ESLint reports no warnings for this test.
-- [ ] The sign-off journey verifies an over-limit approval, eligible handler selection, payment, recorded signer, and removal of sign-off controls.
-- [ ] Add a browser test for read-only agent instructions and assert story, item and document content on the claim page.
-- [ ] `npm run e2e` passes on two consecutive runs without manual database cleanup or paid model calls.
+- [x] Automated tests cannot reuse the ordinary development backend or change its database; use dedicated test ports and an isolated test database with deterministic setup.
+- [x] Replace the conditional early return in `e2e/claim.spec.ts` with deterministic setup and assertions; ESLint reports no warnings for this test.
+- [x] The sign-off journey verifies an over-limit approval, eligible handler selection, payment, recorded signer, and removal of sign-off controls.
+- [x] Add a browser test for read-only agent instructions and assert story, item and document content on the claim page.
+- [x] `npm run e2e` passes on two consecutive runs without manual database cleanup or paid model calls.
 
 ### Completion phase 4: inspect the pages in the browser
 

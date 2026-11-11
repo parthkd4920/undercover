@@ -4,19 +4,18 @@ export default defineConfig({
   testDir: "e2e",
   outputDir: "e2e/test-results",
   reporter: "list",
-  use: { baseURL: "http://localhost:5173" },
+  use: { baseURL: "http://127.0.0.1:15173" },
   webServer: [
     {
-      command:
-        "node -e \"require('fs').rmSync('e2e/undercover-e2e.db',{force:true})\" && uv run -m uvicorn backend.main:app --port 8000",
-      url: "http://127.0.0.1:8000/api/health",
-      reuseExistingServer: true,
-      env: { ...process.env, UNDERCOVER_DB: "e2e/undercover-e2e.db" },
+      command: "uv run -m e2e.server",
+      url: "http://127.0.0.1:18000/api/health",
+      reuseExistingServer: false,
     },
     {
-      command: "npx vite dashboard --port 5173 --strictPort",
-      url: "http://localhost:5173",
-      reuseExistingServer: true,
+      command: "npx vite dashboard --host 127.0.0.1 --port 15173 --strictPort",
+      url: "http://127.0.0.1:15173",
+      env: { UNDERCOVER_API_URL: "http://127.0.0.1:18000" },
+      reuseExistingServer: false,
     },
   ],
 });
