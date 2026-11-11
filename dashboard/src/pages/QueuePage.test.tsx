@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { ClaimRow, ClaimStatus } from "../lib/api";
 import { QueuePage } from "./QueuePage";
@@ -6,6 +12,7 @@ import { QueuePage } from "./QueuePage";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function claim(
@@ -106,7 +113,7 @@ it("shows an error when the queue cannot be loaded", async () => {
   expect(await screen.findByRole("alert")).toBeDefined();
 });
 
-it("runs only the selected waiting claim from the top control", async () => {
+it("starts every waiting claim before any run completes and prevents duplicate clicks", async () => {
   let finish!: (value: Response) => void;
   const pending = new Promise<Response>((resolve) => {
     finish = resolve;
@@ -117,27 +124,34 @@ it("runs only the selected waiting claim from the top control", async () => {
     claim("CLM-1003", "Sam", "declined", 0),
   ];
   const fetchMock = vi.fn((input: string, init?: RequestInit) =>
-    init?.method === "POST" ? pending : new Response(JSON.stringify(records)),
+    init?.method === "POST"
+      ? pending.then((response) => response.clone())
+      : new Response(JSON.stringify(records)),
   );
   vi.stubGlobal("fetch", fetchMock);
   render(<QueuePage />);
   await screen.findByText("Maya Patel");
-  expect(screen.getAllByRole("option")).toHaveLength(2);
-  fireEvent.change(screen.getByLabelText("Waiting claim"), {
-    target: { value: "CLM-1002" },
-  });
   fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
-  expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
-    method: "POST",
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1001/run", {
+      method: "POST",
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
+      method: "POST",
+    });
   });
+  const button = screen.getByRole("button", {
+    name: "Running all waiting claims",
+  });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  fireEvent.click(button);
   expect(
-    screen.getByRole("button", { name: "Running" }).hasAttribute("disabled"),
-  ).toBe(true);
+    fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"),
+  ).toHaveLength(2);
   finish(new Response(JSON.stringify({ reply: "Done" })));
   await pending;
-  await vi.waitFor(() => {
-    expect(screen.getByRole("button", { name: "Run agent" })).toBeDefined();
-  });
+  await screen.findByText("Finished 2 of 2 agent runs.");
+  expect(screen.queryByRole("combobox")).toBeNull();
 });
 
 it("disables the top run button when no claims are waiting", async () => {
@@ -156,4 +170,68 @@ it("disables the top run button when no claims are waiting", async () => {
     screen.getByRole("button", { name: "Run agent" }).hasAttribute("disabled"),
   ).toBe(true);
   expect(screen.queryByRole("option")).toBeNull();
+});
+
+it("continues other waiting runs when one claim fails and identifies the failed claim", async () => {
+  const records = [
+    claim("CLM-1001", "Maya Patel", "waiting", null),
+    claim("CLM-1002", "Liam Nguyen", "waiting", null),
+  ];
+  const fetchMock = vi.fn((input: string, init?: RequestInit) => {
+    if (init?.method !== "POST") return new Response(JSON.stringify(records));
+    if (input.includes("CLM-1001"))
+      return new Response(JSON.stringify({ detail: "Model unavailable" }), {
+        status: 500,
+      });
+    return new Response(JSON.stringify({ reply: "Done" }));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<QueuePage />);
+  await screen.findByText("Maya Patel");
+  fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "CLM-1001: Model unavailable",
+  );
+  expect(screen.getByText("Finished 1 of 2 agent runs.")).toBeDefined();
+  expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
+    method: "POST",
+  });
+});
+
+it("uses a fresh waiting snapshot before starting the batch", async () => {
+  const records = [claim("CLM-1001", "Maya Patel", "waiting", null)];
+  const fetchMock = vi.fn(() => new Response(JSON.stringify(records)));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<QueuePage />);
+  await screen.findByText("Maya Patel");
+  records[0].status = "in_progress";
+  fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+  await screen.findByText("Finished 0 of 0 agent runs.");
+  expect(fetchMock.mock.calls).toHaveLength(3);
+});
+
+it("refreshes count cards when the queue changes during polling", async () => {
+  vi.useFakeTimers();
+  const records = [claim("CLM-1001", "Maya Patel", "waiting", null)];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => new Response(JSON.stringify(records))),
+  );
+  render(<QueuePage />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(
+    screen.getByText("Waiting claims").nextElementSibling?.textContent,
+  ).toBe("1");
+  records[0].status = "approved";
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(
+    screen.getByText("Waiting claims").nextElementSibling?.textContent,
+  ).toBe("0");
+  expect(
+    screen.getByText("Approved claims").nextElementSibling?.textContent,
+  ).toBe("1");
 });

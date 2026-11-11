@@ -576,3 +576,70 @@ textarea:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 4px;
 }
+
+/* Large queue totals use the same records and refresh cycle as the table. */
+.claim-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 24px;
+}
+
+.summary-card {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 22px 18px;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.summary-card dt {
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 42px;
+}
+
+.summary-card dd {
+  margin: 10px 0 0;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.summary-total dd,
+.summary-signoff dd {
+  color: var(--ink);
+}
+
+.summary-waiting dd {
+  color: var(--gold-ink);
+}
+
+.summary-approved dd {
+  color: var(--accent);
+}
+
+.summary-denied dd {
+  color: var(--raspberry);
+}
+
+.summary-review dd {
+  color: var(--coral-ink);
+}
+
+@media (max-width: 1050px) {
+  .claim-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .claim-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .summary-card {
+    padding: 18px 16px;
+  }
+}

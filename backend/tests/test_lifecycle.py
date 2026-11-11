@@ -1,11 +1,13 @@
 """Tests for the claim lifecycle: steps, decisions, payments and sign-off."""
 
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import database
+from backend import database, main
 from backend.main import app
 
 client = TestClient(app)
@@ -287,3 +289,28 @@ def test_failed_agent_run_leaves_claim_in_progress(monkeypatch):
     claim = client.get("/api/claims/CLM-1001").json()
     assert claim["status"] == "in_progress"
     assert claim["decision"] is None
+
+
+def test_competing_agent_starts_run_claim_only_once(monkeypatch):
+    """Two dashboards must not invoke the model twice for the same waiting claim."""
+    barrier = Barrier(2)
+    original = main.claim_or_error
+    runs = []
+
+    def read_together(connection, claim_id):
+        row = original(connection, claim_id)
+        barrier.wait(timeout=5)
+        return row
+
+    def fake_run(claim_id, thread_id):
+        runs.append(claim_id)
+        return "Done"
+
+    monkeypatch.setattr(main, "claim_or_error", read_together)
+    monkeypatch.setattr("agent.main.run", fake_run)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(
+            executor.map(lambda _: client.post("/api/claims/CLM-1001/run"), range(2))
+        )
+    assert sorted(response.status_code for response in responses) == [200, 409]
+    assert runs == ["CLM-1001"]

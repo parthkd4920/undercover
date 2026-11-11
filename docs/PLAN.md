@@ -64,7 +64,7 @@ The dashboard triggers the agent through `run_agent` on the backend, which calls
 
 React with Vite and TypeScript, hash routes, no router dependency. Brand per `docs/BRAND.md`: Instrument Sans for headings and body, Instrument Serif for the tagline, JetBrains Mono for ids, numbers and money; panels rounded with no outline; light and dark modes via `prefers-color-scheme`. The six claim states use Sea Green (`approved`), Raspberry (`declined`), Marigold (`in_progress`), Coral (`waiting_for_sign_off` and `waiting_for_human_review`) and Cerulean (`waiting`), always with text labels. Raspberry and Cerulean have white text; the others have Midnight text.
 
-- `#/` the queue: every claim with its status, amount and a top Run agent button for one selected waiting claim; refreshed while the agent works.
+- `#/` the queue: every claim with its status, amount and six live count cards and a top Run agent button that starts all waiting claims together; refreshed while the agent works.
 - `#/claims/{id}` the claim in full: story, items, documents, the customer and policy, the agent's steps as they happen (polled while the claim is in progress), the decision with payout, reason and policy reference, payment, and a sign-off with a handler choice on claims waiting for sign-off and approve or deny buttons on the claims referred to human to decide.
 - `#/agent` the agent's instructions, read only
 
@@ -300,3 +300,13 @@ Extend the isolated Playwright fixtures and browser suite. Reconcile the active 
 Implementation handoff: the five phases were implemented in order. Migration was verified on temporary legacy databases, and browser journeys use disposable records without model calls. Existing development records upgrade on their next backend database connection. No later course build is included.
 
 Outcome/review verification: `npm run check` passed with 89 Python tests (99.30% coverage), 47 dashboard tests (96.12% statement coverage), and 21 browser tests. The expanded browser suite passed on two consecutive clean setups. Playwright Chromium screenshots were inspected directly because no Playwright MCP server is available: queue, review errors and controls, long referral explanations and sign-off focus are readable in light/dark mode at 1440px and 390px. All five phases were committed with hooks enabled; unrelated student edits were preserved and nothing was pushed.
+
+## Batch run and queue totals update
+
+The student requested this implementation directly. It supersedes the earlier single-claim selector. Run agent fetches the current queue, starts every waiting claim concurrently through the existing run API, waits for all results, and reports failures by claim without cancelling other runs. The button prevents another batch while these runs are pending. Each backend start conditionally claims a waiting record so two dashboards cannot run it twice. No model or tool architecture changes are required.
+
+Six large responsive cards precede the queue: Total claims, Waiting claims, Approved claims, Denied claims, Referred to human, and Waiting to sign off. Counts use current statuses from the same polled records as the table. Denied maps to declined; referred and sign-off counts represent currently pending claims. In-progress claims contribute to total but have no separate card, matching the requested six cards. A dash is shown before records load.
+
+Verification includes concurrent starts before any completion, waiting-only selection from a fresh snapshot, partial failures, duplicate clicks/competing dashboards, empty/loading counts and live count updates. The browser batch test intercepts run requests so it never calls a real model. Desktop/phone screenshots in both themes verify the cards.
+
+Batch/totals verification passed: `npm run check` reports 90 Python tests (99.31% coverage), 52 dashboard tests (95.36% statements), and 22 browser tests. Queue screenshots were inspected at 1440px and 390px in light and dark mode using Playwright Chromium in place of the unavailable MCP server. All six cards fit and remain legible.

@@ -20,6 +20,8 @@ Our goal is to handle claims straight through, as accurately as our handlers do.
 ## What the team needs to see
 
 - The queue, with where each claim stands: waiting, in progress, waiting for sign-off, waiting for human review, approved or declined. Approved means the payout has been recorded; an approval awaiting payment is still in progress.
+- Six large count cards above the queue: total claims, waiting, approved, denied, referred to a human, and waiting for sign-off.
+- One Run agent button starts all currently waiting claims together, without selecting claims individually.
 - Each claim in full, with the agent's decision and its reasons.
 - Uncertain cases referred to a human with an explanation of what needs review. A handler can approve or deny them with a reason and policy reference; the original referral and the reviewer remain visible.
 - What the agent is doing on a claim while it works, step by step.

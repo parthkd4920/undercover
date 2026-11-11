@@ -154,9 +154,13 @@ def run_agent(claim_id: str) -> dict[str, str]:
         row = claim_or_error(connection, claim_id)
         if row["status"] != "waiting":
             raise HTTPException(409, f"Claim {claim_id} is not waiting in the queue")
-        connection.execute(
-            "UPDATE claims SET status = 'in_progress' WHERE claim_id = ?", (claim_id,)
+        cursor = connection.execute(
+            "UPDATE claims SET status = 'in_progress'"
+            " WHERE claim_id = ? AND status = 'waiting'",
+            (claim_id,),
         )
+        if cursor.rowcount != 1:
+            raise HTTPException(409, f"Claim {claim_id} is no longer waiting")
         connection.commit()
     reply = agent.run(claim_id, claim_id)
     return {"reply": reply}
