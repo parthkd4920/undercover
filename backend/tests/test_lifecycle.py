@@ -270,3 +270,18 @@ def test_invalid_money_cannot_change_a_claim(amount, operation):
     response = client.post(f"/api/claims/CLM-1001/{operation}", json=body)
     assert response.status_code == 422
     assert client.get("/api/claims/CLM-1001").json() == before
+
+
+def test_failed_agent_run_leaves_claim_in_progress(monkeypatch):
+    """Document the pilot's current lack of automatic run recovery."""
+
+    def fail_run(claim_id, thread_id):
+        raise RuntimeError("Model unavailable")
+
+    monkeypatch.setattr("agent.main.run", fail_run)
+    failed_client = TestClient(app, raise_server_exceptions=False)
+    response = failed_client.post("/api/claims/CLM-1001/run")
+    assert response.status_code == 500
+    claim = client.get("/api/claims/CLM-1001").json()
+    assert claim["status"] == "in_progress"
+    assert claim["decision"] is None

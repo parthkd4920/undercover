@@ -43,7 +43,7 @@ Every operation has an `operation_id`, a one-line docstring and no optional inpu
 | `get_policy_wording` | The policy wording text |
 | `get_agent_instructions` | The agent's instructions, read only |
 
-Rules enforced by the backend, not by the prompt: `pay_claim` refuses an amount over the approval limit unless the claim has been signed off, refuses a claim that is not approved or is already paid, and refuses to pay more than the approved payout. `decide_claim` refuses a claim that is not in progress or already decided. `sign_off_claim` requires a handler with `can_approve_over_limit` and a claim that is waiting for sign-off. Failures are HTTP errors with a plain-English `detail`, which the agent's tools return to the model as text so it can respond sensibly when a payment is blocked.
+Rules enforced by the backend, not by the prompt: `pay_claim` refuses payment against an approved payout over the approval limit unless the claim has been signed off, refuses a claim that is not approved or is already paid, and refuses to pay more than the approved payout. `decide_claim` refuses a claim that is not in progress or already decided. `sign_off_claim` requires a handler with `can_approve_over_limit` and a claim that is waiting for sign-off. Failures are HTTP errors with a plain-English `detail`, which the agent's tools return to the model as text so it can respond sensibly when a payment is blocked.
 
 The agent's instructions live in `backend/instructions.md`, served by `get_agent_instructions` and read by both the agent and the dashboard, so everyone sees the same text.
 
@@ -126,12 +126,12 @@ The claim page: story, items and documents, the customer and policy, the agent's
 - [x] With isolated backend/Vite test servers, Playwright Chromium (substituting for the unavailable MCP server): open a claim, see the story, items and documents; open the agent instructions, read only
 - [x] An e2e test decides a claim over $1,000 through the backend API, then signs off on the claim page and sees the claim decided and paid
 - [x] An e2e test runs the pages in dark mode
-- [ ] `npm run check` passes in full: ruff, pyright, pytest, prettier, eslint, tsc, vitest and Playwright
-- [ ] `docs/STATUS.md` describes the whole build, how to run it and any known gaps
+- [x] `npm run check` passes in full: ruff, pyright, pytest, prettier, eslint, tsc, vitest and Playwright
+- [x] `docs/STATUS.md` describes the whole build, how to run it and any known gaps
 
 ## Next steps after the current-code review (November 11, 2026)
 
-This is a completion plan for the pilot, preserving the original phases above. No later build brief is present in `docs/`, so the next work stays within the pilot. Implementation requires the student's review of this plan first.
+This is a completion plan for the pilot, preserving the original phases above. No later build brief is present in `docs/`, so the next work stays within the pilot. The student approved implementation, and all completion phases below are verified.
 
 ### Review baseline
 
@@ -186,7 +186,9 @@ Browser review evidence: Playwright Chromium generated screenshots in `e2e/test-
 
 Update the documentation to describe the verified product and any remaining limitations. Keep future harness, database migration and deployment work out of this pilot completion.
 
-- [ ] `docs/STATUS.md` describes all three dashboard routes, the backend and agent architecture, payment/sign-off enforcement, run commands and known limitations. Assess and document the current behavior where a failed agent run can leave a claim `in_progress`; do not claim retry or recovery exists.
-- [ ] Tick the original Phase 6 criteria only when their corresponding checks and browser review are complete.
-- [ ] Run `npm run check` after the final product changes; all checks pass without lowering thresholds or disabling rules.
-- [ ] Commit each completed implementation phase with the pre-commit hook enabled, staging only its intended files and preserving unrelated student work. Do not push.
+- [x] `docs/STATUS.md` describes all three dashboard routes, the backend and agent architecture, payment/sign-off enforcement, run commands and known limitations. Assess and document the current behavior where a failed agent run can leave a claim `in_progress`; do not claim retry or recovery exists.
+- [x] Tick the original Phase 6 criteria only when their corresponding checks and browser review are complete.
+- [x] Run `npm run check` after the final product changes; all checks pass without lowering thresholds or disabling rules.
+- [x] Commit each completed implementation phase with the pre-commit hook enabled, staging only its intended files and preserving unrelated student work. Do not push.
+
+Final verification: `npm run check` passed with 58 Python tests (99.67% coverage), 31 dashboard tests (96.38% statement coverage), and 11 Playwright tests. Format, lint and type checks passed without lint warnings. Each completion phase was committed with hooks enabled; unrelated notebook and code-standard edits were preserved, and nothing was pushed. The failed-run limitation is documented and covered by a regression test.
