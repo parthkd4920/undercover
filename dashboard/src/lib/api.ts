@@ -1,7 +1,12 @@
 /** The API client for the UnderCover backend. */
 
 export type ClaimStatus =
-  "waiting" | "in_progress" | "waiting_for_sign_off" | "decided";
+  | "waiting"
+  | "in_progress"
+  | "waiting_for_sign_off"
+  | "waiting_for_human_review"
+  | "approved"
+  | "declined";
 
 export interface ClaimRow {
   claim_id: string;
@@ -46,6 +51,11 @@ export interface Claim {
   reason: string | null;
   reference: string | null;
   decided_on: string | null;
+  referral_reason: string | null;
+  referral_reference: string | null;
+  referred_on: string | null;
+  reviewed_by: string | null;
+  reviewed_on: string | null;
   signed_off_by: string | null;
   signed_off_on: string | null;
   paid_amount: number | null;
@@ -105,10 +115,12 @@ export interface Handler {
 
 async function fail(response: Response): Promise<never> {
   const body = (await response.json().catch(() => null)) as {
-    detail?: string;
+    detail?: string | { msg: string }[];
   } | null;
   throw new Error(
-    body?.detail ?? `The backend answered ${String(response.status)}`,
+    Array.isArray(body?.detail)
+      ? body.detail.map((issue) => issue.msg).join("; ")
+      : (body?.detail ?? `The backend answered ${String(response.status)}`),
   );
 }
 
@@ -176,4 +188,25 @@ export async function backendUp(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export interface HumanReview {
+  handler_id: string;
+  decision: "approve" | "decline";
+  payout: number;
+  reason: string;
+  reference: string;
+}
+
+/** Submit a handler's final decision on a referred claim. */
+export async function resolveHumanReview(
+  claimId: string,
+  review: HumanReview,
+): Promise<void> {
+  const response = await fetch(`/api/claims/${claimId}/human-review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(review),
+  });
+  if (!response.ok) await fail(response);
 }

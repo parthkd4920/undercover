@@ -10,6 +10,7 @@ function message(cause: unknown, fallback: string): string {
 }
 
 export function QueuePage() {
+  const [selectedId, setSelectedId] = useState("");
   const [claims, setClaims] = useState<ClaimRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
@@ -47,12 +48,42 @@ export function QueuePage() {
     refresh();
   }
 
+  const waiting = claims?.filter((claim) => claim.status === "waiting") ?? [];
+  const selected =
+    waiting.find((claim) => claim.claim_id === selectedId)?.claim_id ??
+    waiting.at(0)?.claim_id ??
+    "";
+
   return (
     <section className="panel">
       <h2>Claims</h2>
       <p className="sub">
         The queue the UnderCover Agent works, with where each claim stands
       </p>
+      <div className="queue-actions">
+        <label>
+          Waiting claim
+          <select
+            value={selected}
+            disabled={running !== null || waiting.length === 0}
+            onChange={(event) => {
+              setSelectedId(event.target.value);
+            }}
+          >
+            {waiting.map((claim) => (
+              <option key={claim.claim_id} value={claim.claim_id}>
+                {claim.claim_id} — {claim.customer_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          disabled={selected === "" || running !== null}
+          onClick={() => void run(selected)}
+        >
+          {running === null ? "Run agent" : "Running"}
+        </button>
+      </div>
       {loadError !== null && (
         <p className="error" role="alert">
           {loadError}
@@ -77,7 +108,6 @@ export function QueuePage() {
                 <th className="right">Claimed</th>
                 <th className="right">Payout</th>
                 <th>Status</th>
-                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -98,16 +128,6 @@ export function QueuePage() {
                   </td>
                   <td>
                     <StatusChip status={claim.status} />
-                  </td>
-                  <td className="right">
-                    {claim.status === "waiting" && (
-                      <button
-                        disabled={running === claim.claim_id}
-                        onClick={() => void run(claim.claim_id)}
-                      >
-                        {running === claim.claim_id ? "Running" : "Run agent"}
-                      </button>
-                    )}
                   </td>
                 </tr>
               ))}

@@ -49,3 +49,5 @@ Phase 1 is verified: legacy records migrate transactionally and idempotently to 
 Phase 2 is verified: `refer_human` and `resolve_human_review` API operations preserve referral/reviewer records and enforce payout authority in write transactions. Competing reviews resolve once, and failed activity writes roll back the decision/payment. The legacy refer decision delegates to the same handoff logic. Python checks pass: 80 tests, 99.05% coverage.
 
 Phase 3 is verified: the ninth agent tool, `refer_human`, hands off missing evidence, conflicting accounts or unclear policy applicability. Instructions distinguish clear exclusions from uncertainty and require stopping after handoff. Handler resolution is not an agent tool. Stub-model checks pass: 86 Python tests, 99.07% coverage.
+
+Phase 4 is verified: six explicit chips, a handler review form, preserved referral reasons and reviewer labels, pending-review/sign-off polling, and a top single-claim Run agent selector are implemented. Form validation, API errors, double-submission prevention and external handler resolution are covered. TypeScript checks pass: 47 tests, 96.12% statement coverage.

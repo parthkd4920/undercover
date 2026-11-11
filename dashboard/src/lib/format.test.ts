@@ -14,7 +14,11 @@ describe("statusLabel", () => {
     expect(statusLabel("waiting")).toBe("Waiting");
     expect(statusLabel("in_progress")).toBe("In progress");
     expect(statusLabel("waiting_for_sign_off")).toBe("Waiting for sign-off");
-    expect(statusLabel("decided")).toBe("Decided");
+    expect(statusLabel("approved")).toBe("Approved");
+    expect(statusLabel("declined")).toBe("Declined");
+    expect(statusLabel("waiting_for_human_review")).toBe(
+      "Waiting for human review",
+    );
   });
 });
 

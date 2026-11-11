@@ -22,7 +22,7 @@ function claim(
     customer_name: customer,
     amount_claimed: id === "CLM-1002" ? 1500 : 420,
     status,
-    decision: status === "decided" ? "approve" : null,
+    decision: status === "approved" ? "approve" : null,
     payout,
     submitted_on: "2026-06-24",
   };
@@ -55,6 +55,11 @@ function stubFetch(claims: ClaimRow[]) {
             payout: null,
             reason: null,
             reference: null,
+            referral_reason: null,
+            referral_reference: null,
+            referred_on: null,
+            reviewed_by: null,
+            reviewed_on: null,
             decided_on: null,
             signed_off_by: null,
             signed_off_on: null,
@@ -116,12 +121,12 @@ function stubFetch(claims: ClaimRow[]) {
 it("shows the queue with each claim's standing", async () => {
   stubFetch([
     claim("CLM-1001", "Maya Patel", "waiting", null),
-    claim("CLM-1002", "Liam Nguyen", "decided", 500),
+    claim("CLM-1002", "Liam Nguyen", "approved", 500),
   ]);
   render(<App />);
   expect(await screen.findByText("Maya Patel")).toBeDefined();
   expect(screen.getByText("Waiting")).toBeDefined();
-  expect(screen.getByText("Decided")).toBeDefined();
+  expect(screen.getByText("Approved")).toBeDefined();
   expect(screen.getByText("$420.00")).toBeDefined();
   expect(screen.getByText("$1,500.00")).toBeDefined();
   expect(screen.getByText("$500.00")).toBeDefined();

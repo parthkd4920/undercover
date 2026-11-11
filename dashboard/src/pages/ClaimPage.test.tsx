@@ -83,7 +83,7 @@ const policy: Policy = {
 };
 
 function claim(status: ClaimStatus): Claim {
-  const decided = status === "decided" || status === "waiting_for_sign_off";
+  const decided = status === "approved" || status === "waiting_for_sign_off";
   return {
     claim_id: "CLM-1001",
     policy_id: "POL-2001",
@@ -116,11 +116,16 @@ function claim(status: ClaimStatus): Claim {
       ? "The airline's cancellation and the receipts support the claim."
       : null,
     reference: decided ? "Section 3 (Trip Delay); section 10" : null,
+    referral_reason: null,
+    referral_reference: null,
+    referred_on: null,
+    reviewed_by: null,
+    reviewed_on: null,
     decided_on: decided ? "2026-06-25T09:00:00Z" : null,
     signed_off_by: null,
     signed_off_on: null,
-    paid_amount: status === "decided" ? 420 : null,
-    paid_on: status === "decided" ? "2026-06-25T09:01:00Z" : null,
+    paid_amount: status === "approved" ? 420 : null,
+    paid_on: status === "approved" ? "2026-06-25T09:01:00Z" : null,
   };
 }
 
@@ -158,7 +163,7 @@ function stubBackend(
         if (options.claimResponse !== undefined)
           return options.claimResponse(id);
         const loaded = claimsByStatus[id];
-        if (signedOff) return new Response(JSON.stringify(claim("decided")));
+        if (signedOff) return new Response(JSON.stringify(claim("approved")));
         return new Response(JSON.stringify(loaded));
       }
       if (input === "/api/claims/CLM-1001/steps") {
@@ -194,10 +199,10 @@ function stubBackend(
 }
 
 it("shows a decided claim with its decision, payment and the agent's work", async () => {
-  stubBackend({ "CLM-1001": claim("decided") });
+  stubBackend({ "CLM-1001": claim("approved") });
   render(<ClaimPage claimId="CLM-1001" />);
   expect(await screen.findByText("maya.patel@example.com")).toBeDefined();
-  expect(screen.getByText("Decided")).toBeDefined();
+  expect(screen.getByText("Approved")).toBeDefined();
   expect(screen.getByText("Airport hotel, one night")).toBeDefined();
   expect(screen.getByText(/Hotel receipt/)).toBeDefined();
   expect(screen.getByText("Read claim CLM-1001")).toBeDefined();
@@ -218,7 +223,7 @@ it("shows a claim waiting for sign-off and signs it off", async () => {
     target: { value: "HND-02" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Sign off" }));
-  expect(await screen.findByText("Decided")).toBeDefined();
+  expect(await screen.findByText("Approved")).toBeDefined();
   expect(screen.getByText(/Paid \$420\.00 on/)).toBeDefined();
 });
 
@@ -245,7 +250,7 @@ it.each(["decline", "refer"])(
   async (decision) => {
     stubBackend({
       "CLM-1001": {
-        ...claim("decided"),
+        ...claim("approved"),
         decision,
         payout: 0,
         paid_amount: null,
@@ -255,17 +260,25 @@ it.each(["decline", "refer"])(
     render(<ClaimPage claimId="CLM-1001" />);
     await screen.findByText("maya.patel@example.com");
     expect(screen.queryByText(/sign-off to pay/)).toBeNull();
-    expect(screen.queryByText("Payment pending")).toBeNull();
+    expect(screen.queryByText("Approval recorded, payment pending")).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
   },
 );
 
 it("labels an unpaid approval within the limit accurately", async () => {
   stubBackend({
-    "CLM-1001": { ...claim("decided"), paid_amount: null, paid_on: null },
+    "CLM-1001": {
+      ...claim("in_progress"),
+      decision: "approve",
+      payout: 420,
+      paid_amount: null,
+      paid_on: null,
+    },
   });
   render(<ClaimPage claimId="CLM-1001" />);
-  expect(await screen.findByText("Payment pending")).toBeDefined();
+  expect(
+    await screen.findByText("Approval recorded, payment pending"),
+  ).toBeDefined();
   expect(screen.queryByText(/sign-off to pay/)).toBeNull();
 });
 
@@ -337,7 +350,7 @@ it("ignores a delayed response after navigating to another claim", async () => {
   view.rerender(<ClaimPage claimId="CLM-1002" />);
   await screen.findByRole("heading", { name: "CLM-1002" });
   await act(async () => {
-    finish(new Response(JSON.stringify(claim("decided"))));
+    finish(new Response(JSON.stringify(claim("approved"))));
     await pending;
   });
   expect(screen.queryByRole("heading", { name: "CLM-1001" })).toBeNull();
@@ -364,11 +377,11 @@ it("polls an active claim and stops when the decision arrives", async () => {
   });
   expect(fetchMock.mock.calls.length).toBeGreaterThan(calls);
   expect(screen.getByText("Step 2")).toBeDefined();
-  records["CLM-1001"] = claim("decided");
+  records["CLM-1001"] = claim("approved");
   await act(async () => {
     await vi.advanceTimersByTimeAsync(2000);
   });
-  expect(screen.getByText("Decided")).toBeDefined();
+  expect(screen.getByText("Approved")).toBeDefined();
   const finishedCalls = fetchMock.mock.calls.length;
   await act(async () => {
     await vi.advanceTimersByTimeAsync(4000);
@@ -395,7 +408,7 @@ it("cancels polling on unmount", async () => {
 it("renders repeated step descriptions as separate entries", async () => {
   const error = vi.spyOn(console, "error");
   stubBackend(
-    { "CLM-1001": claim("decided") },
+    { "CLM-1001": claim("approved") },
     {
       steps: () => [
         { step: "Read the policy wording", at: "2026-11-11T09:00:00Z" },
@@ -408,3 +421,35 @@ it("renders repeated step descriptions as separate entries", async () => {
   expect(error).not.toHaveBeenCalled();
   error.mockRestore();
 });
+
+it.each(["waiting_for_human_review", "waiting_for_sign_off"] as const)(
+  "follows another handler's resolution from %s",
+  async (status) => {
+    vi.useFakeTimers();
+    const records = { "CLM-1001": claim(status) };
+    stubBackend(records);
+    render(<ClaimPage claimId="CLM-1001" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    records["CLM-1001"] = {
+      ...claim("approved"),
+      referral_reason: "A receipt needs review",
+      reviewed_by: "HND-01",
+      reviewed_on: "2026-11-11",
+    };
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.getByText("Approved")).toBeDefined();
+    expect(screen.getByText("A receipt needs review")).toBeDefined();
+    expect(screen.getByText(/Reviewed by Dana/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign off" })).toBeNull();
+    const calls = vi.mocked(fetch).mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000);
+    });
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
+  },
+);

@@ -21,7 +21,7 @@ function claim(
     customer_name: customer,
     amount_claimed: 420,
     status,
-    decision: status === "decided" ? "approve" : null,
+    decision: status === "approved" ? "approve" : null,
     payout,
     submitted_on: "2026-06-24",
   };
@@ -35,7 +35,7 @@ it("lists the claims with where each stands", async () => {
         new Response(
           JSON.stringify([
             claim("CLM-1001", "Maya Patel", "waiting", null),
-            claim("CLM-1002", "Liam Nguyen", "decided", 500),
+            claim("CLM-1002", "Liam Nguyen", "approved", 500),
           ]),
         ),
     ),
@@ -46,7 +46,7 @@ it("lists the claims with where each stands", async () => {
   expect(screen.getByText("CLM-1001")).toBeDefined();
   expect(screen.getByText("CLM-1002")).toBeDefined();
   expect(screen.getByText("Waiting")).toBeDefined();
-  expect(screen.getByText("Decided")).toBeDefined();
+  expect(screen.getByText("Approved")).toBeDefined();
   expect(screen.getAllByRole("button")).toHaveLength(1);
 });
 
@@ -60,7 +60,7 @@ it("runs the agent on a waiting claim and refreshes the queue", async () => {
   });
   vi.stubGlobal("fetch", fetchMock);
   render(<QueuePage />);
-  await screen.findByRole("button", { name: "Run agent" });
+  await screen.findByText("Maya Patel");
   fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
   await vi.waitFor(() => {
     const ran = fetchMock.mock.calls.some(
@@ -89,7 +89,7 @@ it("shows the error when the agent cannot run", async () => {
     }),
   );
   render(<QueuePage />);
-  await screen.findByRole("button", { name: "Run agent" });
+  await screen.findByText("Maya Patel");
   fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toContain("not waiting");
@@ -104,4 +104,56 @@ it("shows an error when the queue cannot be loaded", async () => {
   );
   render(<QueuePage />);
   expect(await screen.findByRole("alert")).toBeDefined();
+});
+
+it("runs only the selected waiting claim from the top control", async () => {
+  let finish!: (value: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    finish = resolve;
+  });
+  const records = [
+    claim("CLM-1001", "Maya Patel", "waiting", null),
+    claim("CLM-1002", "Liam Nguyen", "waiting", null),
+    claim("CLM-1003", "Sam", "declined", 0),
+  ];
+  const fetchMock = vi.fn((input: string, init?: RequestInit) =>
+    init?.method === "POST" ? pending : new Response(JSON.stringify(records)),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render(<QueuePage />);
+  await screen.findByText("Maya Patel");
+  expect(screen.getAllByRole("option")).toHaveLength(2);
+  fireEvent.change(screen.getByLabelText("Waiting claim"), {
+    target: { value: "CLM-1002" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Run agent" }));
+  expect(fetchMock).toHaveBeenCalledWith("/api/claims/CLM-1002/run", {
+    method: "POST",
+  });
+  expect(
+    screen.getByRole("button", { name: "Running" }).hasAttribute("disabled"),
+  ).toBe(true);
+  finish(new Response(JSON.stringify({ reply: "Done" })));
+  await pending;
+  await vi.waitFor(() => {
+    expect(screen.getByRole("button", { name: "Run agent" })).toBeDefined();
+  });
+});
+
+it("disables the top run button when no claims are waiting", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Response(
+          JSON.stringify([claim("CLM-1001", "Maya Patel", "approved", 420)]),
+        ),
+    ),
+  );
+  render(<QueuePage />);
+  await screen.findByText("Maya Patel");
+  expect(
+    screen.getByRole("button", { name: "Run agent" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(screen.queryByRole("option")).toBeNull();
 });

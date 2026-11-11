@@ -273,13 +273,13 @@ Update `dashboard/src/lib/api.ts`, status labels/chips and CSS, queue fixtures, 
 
 On a referred claim show a Handler selector, payout input in USD, reason and policy-reference fields, and Approve/Deny buttons. The form supplies zero payout for Deny. Show an explanatory message when an approval above $1,000 will need another handler's sign-off. Disable both actions during submission, show API validation errors, and refresh the claim after success. Only referred claims show review controls; existing sign-off controls remain for sign-off claims. Poll both waiting-for-review and waiting-for-sign-off claims so another handler's action appears and closes stale controls; stop at final outcomes and cancel on navigation.
 
-The revised queue paragraph also moves Run agent to the top. Proposed scope is one selected waiting claim: add a claim selector and top Run agent button using the existing single-claim endpoint, disabled when nothing is eligible or a run is pending. Do not infer a dispatcher or batch execution from button placement. This detail is pending the student's preference; the outcome/referral work is independent of that answer.
+The revised queue paragraph also moves Run agent to the top. Proposed scope is one selected waiting claim: add a claim selector and top Run agent button using the existing single-claim endpoint, disabled when nothing is eligible or a run is pending. Do not infer a dispatcher or batch execution from button placement. Implementation uses one selected waiting claim, as proposed and stated at the start of the build.
 
-- [ ] Vitest covers all six status labels/chips with no Decided label, paid approvals, recorded approvals awaiting payment, and readable pending referrals.
-- [ ] Form tests cover approval, denial, missing inputs, invalid amounts, handler selection, API failure, disabled double submission and the over-limit sign-off path; the original referral reason remains visible after resolution.
-- [ ] Tests verify review and sign-off polling observes another handler's resolution and stops afterward; navigation ignores stale responses and failed review requests leave controls recoverable.
-- [ ] Queue tests cover the agreed top-button behavior, waiting-only eligibility and existing run errors without adding batch processing unless explicitly selected.
-- [ ] `npm run check:ts` passes with strict types and at least 80% statement coverage; old fixtures and App tests use the new status contract.
+- [x] Vitest covers all six status labels/chips with no Decided label, paid approvals, recorded approvals awaiting payment, and readable pending referrals.
+- [x] Form tests cover approval, denial, missing inputs, invalid amounts, handler selection, API failure, disabled double submission and the over-limit sign-off path; the original referral reason remains visible after resolution.
+- [x] Tests verify review and sign-off polling observes another handler's resolution and stops afterward; navigation ignores stale responses and failed review requests leave controls recoverable.
+- [x] Queue tests cover the agreed top-button behavior, waiting-only eligibility and existing run errors without adding batch processing unless explicitly selected.
+- [x] `npm run check:ts` passes with strict types and at least 80% statement coverage; old fixtures and App tests use the new status contract.
 
 ### Phase 5: verify journeys and reconcile documentation
 

@@ -15,26 +15,13 @@ import {
   type Step,
 } from "../lib/api";
 import { claimType, money } from "../lib/format";
+import { DecisionPanel } from "../components/DecisionPanel";
+import { HumanReviewForm } from "../components/HumanReviewForm";
 import { StatusChip } from "../components/StatusChip";
 
 /** Describe a failed request. */
 function message(cause: unknown, fallback: string): string {
   return cause instanceof Error ? cause.message : fallback;
-}
-
-/** Display the date portion of a timestamp. */
-function dateOf(at: string): string {
-  return at.slice(0, 10);
-}
-
-/** Use the handler-facing decision label. */
-function decisionWord(decision: string): string {
-  const words: Record<string, string> = {
-    approve: "Approve",
-    decline: "Decline",
-    refer: "Refer",
-  };
-  return words[decision] ?? decision;
 }
 
 /** Display one claim fact. */
@@ -218,88 +205,6 @@ function StepsPanel({
   );
 }
 
-interface DecisionPanelProps {
-  readonly claim: Claim;
-  readonly handlers: readonly Handler[];
-  readonly choice: string;
-  readonly onChoice: (handlerId: string) => void;
-  readonly onSignOff: () => void;
-  readonly signing: boolean;
-  readonly signError: string | null;
-}
-
-/** Show the decision, payment and authorized sign-off controls. */
-function DecisionPanel(props: DecisionPanelProps) {
-  const { claim } = props;
-  const signer =
-    props.handlers.find((handler) => handler.handler_id === claim.signed_off_by)
-      ?.name ?? claim.signed_off_by;
-  return (
-    <section className="panel">
-      <h3>The decision</h3>
-      {claim.decision === null ? (
-        <p className="empty">Not decided yet</p>
-      ) : (
-        <>
-          <p>
-            <strong>{decisionWord(claim.decision)}</strong>
-            {claim.decision === "approve" && claim.payout !== null && (
-              <span className="mono"> {money(claim.payout)}</span>
-            )}
-          </p>
-          <p>{claim.reason}</p>
-          <p className="sub">Policy reference: {claim.reference}</p>
-          {claim.decision === "approve" &&
-            (claim.paid_amount !== null ? (
-              <p>
-                Paid {money(claim.paid_amount)} on {dateOf(claim.paid_on ?? "")}
-              </p>
-            ) : (
-              <p>
-                {claim.status === "waiting_for_sign_off"
-                  ? "Waiting for a handler's sign-off to pay"
-                  : "Payment pending"}
-              </p>
-            ))}
-          {signer !== null && <p className="sub">Signed off by {signer}</p>}
-        </>
-      )}
-      {claim.status === "waiting_for_sign_off" && (
-        <div className="signoff">
-          <label>
-            Handler
-            <select
-              value={props.choice}
-              onChange={(event) => {
-                props.onChoice(event.target.value);
-              }}
-            >
-              {props.handlers
-                .filter((handler) => handler.can_approve_over_limit)
-                .map((handler) => (
-                  <option key={handler.handler_id} value={handler.handler_id}>
-                    {handler.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            disabled={props.signing || props.choice === ""}
-            onClick={props.onSignOff}
-          >
-            {props.signing ? "Signing off" : "Sign off"}
-          </button>
-        </div>
-      )}
-      {props.signError !== null && (
-        <p className="error" role="alert">
-          {props.signError}
-        </p>
-      )}
-    </section>
-  );
-}
-
 /** Reset claim state when the selected claim changes. */
 export function ClaimPage({ claimId }: { readonly claimId: string }) {
   return <ClaimDetail key={claimId} claimId={claimId} />;
@@ -374,7 +279,13 @@ function ClaimDetail({ claimId }: { readonly claimId: string }) {
               : null,
           ),
         );
-        if (loaded.status === "in_progress")
+        if (
+          [
+            "in_progress",
+            "waiting_for_human_review",
+            "waiting_for_sign_off",
+          ].includes(loaded.status)
+        )
           timer = setTimeout(() => void load(), 2000);
       } catch (cause) {
         if (isActive())
@@ -438,7 +349,7 @@ function ClaimDetail({ claimId }: { readonly claimId: string }) {
               <Fact label="Submitted" value={claim.submitted_on} />
               <Fact
                 label="Incident"
-                value={`${dateOf(claim.incident_date)}, ${claim.incident_location}`}
+                value={`${claim.incident_date.slice(0, 10)}, ${claim.incident_location}`}
               />
             </div>
           </section>
@@ -464,6 +375,15 @@ function ClaimDetail({ claimId }: { readonly claimId: string }) {
             signing={signing}
             signError={signError}
           />
+          {claim.status === "waiting_for_human_review" && (
+            <HumanReviewForm
+              claimId={claimId}
+              handlers={handlers}
+              onResolved={() => {
+                setRefresh((value) => value + 1);
+              }}
+            />
+          )}
         </>
       )}
     </div>

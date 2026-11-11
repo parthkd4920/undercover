@@ -185,11 +185,6 @@ h3 {
   white-space: nowrap;
 }
 
-.chip-decided {
-  background: var(--sea-green);
-  color: var(--midnight);
-}
-
 .chip-in_progress {
   background: var(--marigold);
   color: var(--midnight);
@@ -507,4 +502,77 @@ select:focus-visible,
 .items th,
 .items .mono {
   white-space: nowrap;
+}
+
+.chip-approved {
+  background: var(--sea-green);
+  color: var(--midnight);
+}
+
+.chip-declined {
+  background: var(--raspberry);
+  color: white;
+}
+
+.chip-waiting_for_human_review {
+  background: var(--coral);
+  color: var(--midnight);
+}
+
+.review-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.review-form label,
+.queue-actions label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.review-form input,
+.review-form textarea,
+.review-form select,
+.queue-actions select {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--page);
+  color: var(--ink);
+  font: inherit;
+}
+
+.review-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.review-actions,
+.queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.queue-actions label {
+  margin: 0;
+}
+
+.deny {
+  background: var(--raspberry);
+  color: white;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
 }
